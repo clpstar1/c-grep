@@ -7,9 +7,19 @@
 
 int match_line(char * line, char * pattern) {
   for (int i = 0; line[i] != '\n'; i++) {
+
     if (pattern[0] == '\\') {
-      if (isdigit(line[i])) {
-        return 0;
+      switch (pattern[1]) {
+        case 'd':
+          if (isdigit(line[i])) {
+            return 0;
+          }
+          break;
+        case 'w':
+          if (isalpha(line[i])) {
+            return 0;
+          }
+          break;
       }
     }
 
