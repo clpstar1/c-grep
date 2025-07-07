@@ -1,14 +1,22 @@
 #include <stdio.h>
 #include <string.h>
 #include <stdlib.h>
+#include <ctype.h>
 
 #define BUFSZ 1024
 
 int match_line(char * line, char * pattern) {
   for (int i = 0; line[i] != '\n'; i++) {
+    if (pattern[0] == '\\') {
+      if (isdigit(line[i])) {
+        return 0;
+      }
+    }
+
     if (line[i] == pattern[0]) {
       return 0;
     }
+    
   }
   return 1;
 }
