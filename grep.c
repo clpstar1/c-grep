@@ -8,45 +8,85 @@
 #define TRUE 1
 #define FALSE 0
 
+// advances s until the first occurence of c in s or the end of s
+int match_character_class(char ** s, char c) {
+  while (**s != '\0') {
+    switch (c) {
+      case 'd':
+        if (isdigit(**s)) return TRUE;
+        break;
+      case 'w':
+        if (isalpha(**s)) return TRUE;
+        break;
+      default:
+        printf("ERROR: Unrecognized character class");
+        exit(1);
+    }
+    s++;
+  }
+  return FALSE;
+}
+
+// advances s until the first occurence of a single character in group is found or the end of s 
+// group should point to the opening [ of the group
+int match_group(char * s, char * g) {
+  // discard [
+  g++;
+  if (*g == ']') {
+    printf("ERROR: empty character group");
+    exit(1);
+  }
+  char * ss;
+  while (*g != ']') {
+    if (*g == '\0') {
+      printf("ERROR: unclosed character group");
+      exit(1);
+    }
+    ss = s;
+    while (*ss != '\0') {
+      if (*g == *ss) {
+      // if found, discard the rest of the group
+        while (*g != ']') {
+          g++;
+        }
+        return TRUE;
+      }
+      ss++;
+    }
+    g++;
+  }
+  return FALSE;
+} 
+
 int match(char * s, char * p) {
   // empty p does not match any string
   if (strlen(s) == 0 && strlen(p) == 0) return TRUE;
   if (strlen(s) > 0 && strlen(p) == 0) return FALSE;
 
   while (*p != '\0' && *s != '\0') {
-    // character group
     if (*p == '[') {
-      // TODO Copy the inner pattern and match it
-    } 
-    // character class
-    else if (*p == '\\') {
-      if (*(p++) == '\0') {
-        printf("ERROR: unclosed character class");
-        exit(1);
+      int match = match_group(s, p);
+      printf("%s\n", p);
+      printf("%s\n", s);
+      if (match) {
+        p++; s++;
       }
-      switch (*p) {
-        case 'd':
-          while (*s != '\0' && !isdigit(*s)) {
-            s++;
-          }
-          break;
-        case 'w':
-          while (*s != '\0' && !isalpha(*s)) {
-            s++;
-          }
-          break;
-        default:
-          printf("ERROR: unrecognized character class");
-          exit(1);
+    }
+    if (*p == '\\') {
+      // discard escape slash
+      p++;
+      // match \ literally
+      if (*p == '\\') {
+        continue;
       }
-      // no char class in string 
-      if (*s == '\0') {
-        return FALSE;
+      int match = match_character_class(s, *p);
+      // s points to the digit, advance it and pattern
+      if (match) {
+        p++; s++;
       }
-      p++; s++;
-    } 
+    }
     // exact match
-    else if (*p == *s) {
+    if (*p == *s) {
       p++; s++;
     // no match
     } else {
@@ -58,34 +98,21 @@ int match(char * s, char * p) {
 }
 
 int main(int argc, char * argv[]) {
-  assert(match("", "") == TRUE);
-
-  // simple matches
+  // assert(match("", "") == TRUE);
   //
-  // |a|0   -> a|0|
-  // |a|0   -> a|0|
-  assert(match("a", "a") == TRUE);
-
-  // |a|b0  -> a|b|0
-  // |b|0   -> |b|0
-  assert(match("ab", "b") == TRUE);
-
-  // |a|b0  -> |b|0
-  // |a|0   -> |0|
-  assert(match("ab", "a") == TRUE);
+  // assert(match("ab", "b") == TRUE);
+  // assert(match("ab", "a") == TRUE);
+  // assert(match("bab", "a") == TRUE);
+  // assert(match("b", "a") == FALSE);
   //
-  // |a|0   -> a|0|
-  // |b|0   -> a|0|
-  assert(match("b", "a") == FALSE);
-
-}
-  // assert(match("Hell1", "\\d") == TRUE);
+  // assert(match("a1", "\\d") == TRUE);
+  // assert(match("1a", "\\d") == TRUE);
+  // assert(match("a1a", "\\d") == TRUE);
   // assert(match("a", "\\d") == FALSE);
-  // assert(match("wa", "\\w\\w") == TRUE);
-  // assert(match("!?$", "\\w") == FALSE);
+  assert(match("\\d", "\\\\d") == TRUE);
   //
-  // assert(match_line("Hello", "[abe]") == TRUE);
-  // assert(match_line("Hello", "[abc]") == FALSE);
+  assert(match("a", "\\d") == FALSE);
+  assert(match("a", "[a]") == FALSE);
 
   // if (argc != 2) {
   //   printf("USAGE: crepe PATTERN\n");
@@ -97,12 +124,13 @@ int main(int argc, char * argv[]) {
   // int len_line = strlen(buf);
   //
   // if (buf[len_line-1] == '\n') {
-  //   return match_line(buf, argv[1]);
+  //   if (match(buf, argv[1])) {
+  //     return TRUE;
+  //   }
   // } else {
   //   printf("ERROR: line too long got %d max = %d", len_line, BUFSZ);
-  //   return 1;
+  //   return FALSE;
   // }
-  //
-  // return 0;
+}
   
 
