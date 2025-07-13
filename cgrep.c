@@ -41,49 +41,49 @@ void match_escape_seq(char ** s, char c) {
 // advances s until the first occurence of a single character in group is found or the end of s 
 // group should point to the opening [ of the group
 int match_group(char ** s, char ** g) {
-  char * gg = *g;
+  char * g_iter = *g;
 
   // check for unclosed character group
-  while (*gg != ']') {
-    if (*gg == '\0') {
+  while (*g_iter != ']') {
+    if (*g_iter == '\0') {
       printf("ERROR: unclosed character group");
       exit(1);
     }
-    gg++;
+    g_iter++;
   }
   // check for empty character group [
-  gg++;
-  if (*gg == ']') {
+  g_iter++;
+  if (*g_iter == ']') {
     printf("ERROR: empty character group");
     exit(1);
   }
 
   // check for a match
-  gg = *g;
+  g_iter = *g;
   // discard [
-  gg++;
-  char * ss;
+  g_iter++;
+  char * s_iter;
   int match = FALSE;
-  while (match == FALSE && *gg != ']') {
-    ss = *s;
-    while (*ss != '\0') {
-      if (*gg == *ss) {
+  while (match == FALSE && *g_iter != ']') {
+    s_iter = *s;
+    while (*s_iter != '\0') {
+      if (*g_iter == *s_iter) {
         // if found, discard the rest of the group
         match = TRUE;
-        while (*gg != ']') {
-          gg++;
+        while (*g_iter != ']') {
+          g_iter++;
         }
         break;
       }
-      ss++;
+      s_iter++;
     }
     if (!match) {
-      gg++;
+      g_iter++;
     }
   }
   // set s to the found letter
-  *s = ss;
-  *g = gg;
+  *s = s_iter;
+  *g = g_iter;
 } 
 
 int match(char * s, char * p) {
@@ -94,6 +94,7 @@ int match(char * s, char * p) {
   while (*p != '\0' && *s != '\0') {
 
     if (*p == '[') {
+      // match: advance pattern 
       match_group(&s, &p);
       if (*s != '\0') {
         p++;
@@ -111,6 +112,7 @@ int match(char * s, char * p) {
       }
       s++;
     }
+    
     // exact match
     else if (*p == *s) {
       p++; s++;
