@@ -8,6 +8,7 @@
 #define TRUE 1
 #define FALSE 0
 
+
 #define ASSERT(cond) \
   do { \
     if (!(cond)) { \
@@ -19,7 +20,7 @@
 
 // advances s until the first occurence of c in s is found
 // if c is not in s then s will point to '\0' after the call fo the function
-void match_character_class(char ** s, char c) {
+void match_escape_seq(char ** s, char c) {
   while (**s != '\0') {
     switch (c) {
       case 'd':
@@ -28,9 +29,10 @@ void match_character_class(char ** s, char c) {
       case 'w':
         if (isalpha(**s)) return;
         break;
+      // if its not a special character class match it literally
       default:
-        printf("ERROR: Unrecognized character class");
-        exit(1);
+        if (**s == c) return; 
+        break;
     }
     (*s)++;
   }
@@ -102,20 +104,12 @@ int match(char * s, char * p) {
     else if (*p == '\\') {
       // discard escape slash
       p++;
-      // match \ literally
-      if (*p == '\\') {
-        while (*s != '\0' && *s != '\\') {
-          s++;
-        }
+      match_escape_seq(&s, *p);
+      // match: advance pattern 
+      if (*s != '\0') {
         p++;
-      } else {
-        match_character_class(&s, *p);
-        // match: advance pattern 
-        if (*s != '\0') {
-          p++;
-        }
-        s++;
       }
+      s++;
     }
     // exact match
     else if (*p == *s) {
@@ -136,12 +130,18 @@ int main(int argc, char * argv[]) {
   ASSERT(match("bab", "a") == TRUE);
   ASSERT(match("b", "a") == FALSE);
 
+  // match characters not in a character class literally
+  ASSERT(match(".", "\\.") == TRUE);
+
+  // character class 
   ASSERT(match("a1", "\\d") == TRUE);
   ASSERT(match("1a", "\\d") == TRUE);
   ASSERT(match("a1a", "\\d") == TRUE);
   ASSERT(match("a", "\\d") == FALSE);
   ASSERT(match("\\d", "\\\\d") == TRUE);
   ASSERT(match("a", "\\d") == FALSE);
+
+
   ASSERT(match("a", "[a]") == TRUE);
 
   // if (argc != 2) {
