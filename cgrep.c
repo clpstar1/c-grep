@@ -8,54 +8,80 @@
 #define TRUE 1
 #define FALSE 0
 
-// advances s until the first occurence of c in s or the end of s
-int match_character_class(char ** s, char c) {
+#define ASSERT(cond) \
+  do { \
+    if (!(cond)) { \
+      fprintf(stderr, "assertion failed: %s\nFile: %snLine: %d\n", \
+              #cond, __FILE__, __LINE__); \
+      abort(); \
+    } \
+  } while(0) \
+
+// advances s until the first occurence of c in s is found
+// if c is not in s then s will point to '\0' after the call fo the function
+void match_character_class(char ** s, char c) {
   while (**s != '\0') {
     switch (c) {
       case 'd':
-        if (isdigit(**s)) return TRUE;
+        if (isdigit(**s)) return;
         break;
       case 'w':
-        if (isalpha(**s)) return TRUE;
+        if (isalpha(**s)) return;
         break;
       default:
         printf("ERROR: Unrecognized character class");
         exit(1);
     }
-    s++;
+    (*s)++;
   }
-  return FALSE;
 }
 
 // advances s until the first occurence of a single character in group is found or the end of s 
 // group should point to the opening [ of the group
-int match_group(char * s, char * g) {
-  // discard [
-  g++;
-  if (*g == ']') {
-    printf("ERROR: empty character group");
-    exit(1);
-  }
-  char * ss;
-  while (*g != ']') {
-    if (*g == '\0') {
+int match_group(char ** s, char ** g) {
+  char * gg = *g;
+
+  // check for unclosed character group
+  while (*gg != ']') {
+    if (*gg == '\0') {
       printf("ERROR: unclosed character group");
       exit(1);
     }
-    ss = s;
+    gg++;
+  }
+  // check for empty character group [
+  gg++;
+  if (*gg == ']') {
+    printf("ERROR: empty character group");
+    exit(1);
+  }
+
+  // check for a match
+  gg = *g;
+  // discard [
+  gg++;
+  char * ss;
+  int match = FALSE;
+  while (match == FALSE && *gg != ']') {
+    ss = *s;
     while (*ss != '\0') {
-      if (*g == *ss) {
-      // if found, discard the rest of the group
-        while (*g != ']') {
-          g++;
+      if (*gg == *ss) {
+        // if found, discard the rest of the group
+        match = TRUE;
+        while (*gg != ']') {
+          gg++;
         }
-        return TRUE;
+        break;
       }
       ss++;
     }
-    g++;
+    if (!match) {
+      gg++;
+    }
   }
-  return FALSE;
+  // set s to the found letter
+  *s = ss;
+  *g = gg;
 } 
 
 int match(char * s, char * p) {
@@ -64,31 +90,36 @@ int match(char * s, char * p) {
   if (strlen(s) > 0 && strlen(p) == 0) return FALSE;
 
   while (*p != '\0' && *s != '\0') {
+
     if (*p == '[') {
-      int match = match_group(s, p);
-      printf("%s\n", p);
-      printf("%s\n", s);
-      if (match) {
-        p++; s++;
+      match_group(&s, &p);
+      if (*s != '\0') {
+        p++;
       }
+      s++;
     }
-    if (*p == '\\') {
+
+    else if (*p == '\\') {
       // discard escape slash
       p++;
       // match \ literally
       if (*p == '\\') {
-        continue;
-      }
-      int match = match_character_class(s, *p);
-      // s points to the digit, advance it and pattern
-      if (match) {
-        p++; s++;
+        while (*s != '\0' && *s != '\\') {
+          s++;
+        }
+        p++;
+      } else {
+        match_character_class(&s, *p);
+        // match: advance pattern 
+        if (*s != '\0') {
+          p++;
+        }
+        s++;
       }
     }
     // exact match
-    if (*p == *s) {
+    else if (*p == *s) {
       p++; s++;
-    // no match
     } else {
       s++;
     }
@@ -98,21 +129,20 @@ int match(char * s, char * p) {
 }
 
 int main(int argc, char * argv[]) {
-  // assert(match("", "") == TRUE);
-  //
-  // assert(match("ab", "b") == TRUE);
-  // assert(match("ab", "a") == TRUE);
-  // assert(match("bab", "a") == TRUE);
-  // assert(match("b", "a") == FALSE);
-  //
-  // assert(match("a1", "\\d") == TRUE);
-  // assert(match("1a", "\\d") == TRUE);
-  // assert(match("a1a", "\\d") == TRUE);
-  // assert(match("a", "\\d") == FALSE);
-  assert(match("\\d", "\\\\d") == TRUE);
-  //
-  assert(match("a", "\\d") == FALSE);
-  assert(match("a", "[a]") == FALSE);
+  ASSERT(match("", "") == TRUE);
+  
+  ASSERT(match("ab", "b") == TRUE);
+  ASSERT(match("ab", "a") == TRUE);
+  ASSERT(match("bab", "a") == TRUE);
+  ASSERT(match("b", "a") == FALSE);
+
+  ASSERT(match("a1", "\\d") == TRUE);
+  ASSERT(match("1a", "\\d") == TRUE);
+  ASSERT(match("a1a", "\\d") == TRUE);
+  ASSERT(match("a", "\\d") == FALSE);
+  ASSERT(match("\\d", "\\\\d") == TRUE);
+  ASSERT(match("a", "\\d") == FALSE);
+  ASSERT(match("a", "[a]") == TRUE);
 
   // if (argc != 2) {
   //   printf("USAGE: crepe PATTERN\n");
