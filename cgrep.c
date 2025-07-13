@@ -38,10 +38,8 @@ void match_escape_seq(char ** s, char c) {
   }
 }
 
-// advances s until the first occurence of a single character in group is found or the end of s 
-// group should point to the opening [ of the group
-int match_group(char ** s, char ** g) {
-  char * g_iter = *g;
+int match_group(char * s, char * g) {
+  char * g_iter = g;
 
   // check for unclosed character group
   while (*g_iter != ']') {
@@ -58,32 +56,22 @@ int match_group(char ** s, char ** g) {
     exit(1);
   }
 
-  // check for a match
-  g_iter = *g;
+  g_iter = g;
   // discard [
   g_iter++;
+
   char * s_iter;
-  int match = FALSE;
-  while (match == FALSE && *g_iter != ']') {
-    s_iter = *s;
+  while (*g_iter != ']') {
+    s_iter = s;
     while (*s_iter != '\0') {
       if (*g_iter == *s_iter) {
-        // if found, discard the rest of the group
-        match = TRUE;
-        while (*g_iter != ']') {
-          g_iter++;
-        }
-        break;
+        return TRUE;
       }
       s_iter++;
     }
-    if (!match) {
-      g_iter++;
-    }
+    g_iter++;
   }
-  // set s to the found letter
-  *s = s_iter;
-  *g = g_iter;
+  return FALSE;
 } 
 
 int match(char * s, char * p) {
@@ -94,9 +82,21 @@ int match(char * s, char * p) {
   while (*p != '\0' && *s != '\0') {
 
     if (*p == '[') {
-      // match: advance pattern 
-      match_group(&s, &p);
-      if (*s != '\0') {
+      int is_negative_group = FALSE;
+      if (*(p+1) == '^') {
+        is_negative_group = TRUE;
+      }
+      // match: advance pattern
+      int match = match_group(s, p);
+      if (is_negative_group) {
+        match = !match;
+      }
+
+      if (match) {
+        // if found, discard the rest of the group
+        while (*p != ']') {
+          p++;
+        }
         p++;
       }
       s++;
@@ -143,8 +143,10 @@ int main(int argc, char * argv[]) {
   ASSERT(match("\\d", "\\\\d") == TRUE);
   ASSERT(match("a", "\\d") == FALSE);
 
-
-  ASSERT(match("a", "[a]") == TRUE);
+  ASSERT(match("abc", "[a]") == TRUE);
+  ASSERT(match("abc", "[e]") == FALSE);
+  ASSERT(match("abc", "[^abc]") == FALSE);
+  ASSERT(match("def", "[^abc]") == TRUE);
 
   // if (argc != 2) {
   //   printf("USAGE: crepe PATTERN\n");
