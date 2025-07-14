@@ -18,26 +18,6 @@
     } \
   } while(0) \
 
-// advances s until the first occurence of c in s is found
-// if c is not in s then s will point to '\0' after the call fo the function
-void match_escape_seq(char ** s, char c) {
-  while (**s != '\0') {
-    switch (c) {
-      case 'd':
-        if (isdigit(**s)) return;
-        break;
-      case 'w':
-        if (isalpha(**s)) return;
-        break;
-      // if its not a special character class match it literally
-      default:
-        if (**s == c) return; 
-        break;
-    }
-    (*s)++;
-  }
-}
-
 typedef enum quantifier {
   Single,
   Plus,
@@ -131,7 +111,7 @@ token_array * tokenize(char * pattern) {
             t[t_index].val = mk_character_class('w');
             break;
           default:
-            t[t_index].val = mk_simple(pattern[p_index]);
+            t[t_index].val = mk_character_class(pattern[p_index]);
             t[t_index].quant = Single;
         }
       }
@@ -150,6 +130,25 @@ token_array * tokenize(char * pattern) {
   return arr;
 }
 
+// advances s until the first occurence of c in s is found
+// if c is not in s then s will point to '\0' after the call fo the function
+void match_escape_seq(char ** s, char c) {
+  while (**s != '\0') {
+    switch (c) {
+      case 'd':
+        if (isdigit(**s)) return;
+        break;
+      case 'w':
+        if (isalpha(**s)) return;
+        break;
+      // if its not a special character class match it literally
+      default:
+        if (**s == c) return; 
+        break;
+    }
+    (*s)++;
+  }
+}
 
 int match_group(char * s, char * g) {
   char * g_iter = g;
@@ -187,12 +186,43 @@ int match_group(char * s, char * g) {
   return FALSE;
 } 
 
+bool match_token(char * s, char * tval) {
+  if (*tval == '\\') {
+    tval++;
+    // printf("s = %s, tval = %s\n", s, tval);
+    switch (*tval) {
+      case 'd': return isdigit(*s);
+      case 'w': return isalpha(*s);
+      default: return *s == *tval;
+    }
+  }
+  else if (*tval == '[') {
+    tval++;
+    char * s_iter;
+    while (*tval != ']') {
+      s_iter = s;
+      while (*s_iter != '\0') {
+        if (match_token(s_iter, tval)) return true;
+        s_iter++;
+      }
+      tval++;
+    }
+    return false;
+  }
+  else {
+    return *s == *tval;
+  }
+}
+
 int match(char *s, char *p) {
   if (strlen(s) == 0 && strlen(p) == 0) return TRUE;
   if (strlen(s) > 0 && strlen(p) == 0) return FALSE;
 
   token_array arr = *tokenize(p);
   token * tokens = arr.t; 
+  // for (int i = 0; i < arr.length; i++) {
+  //   printf("val = %s, quant = %d\n", tokens[i].val, tokens[i].quant);
+  // }
 
   // match all tokens in arr against string s
   //
@@ -200,14 +230,15 @@ int match(char *s, char *p) {
 
   int ti = 0;
   while (ti < arr.length && *s != '\0') {
-    quantifier q = tokens[ti].quant;
-    char * val = tokens[ti].val;
+    token t = tokens[ti];
+    quantifier q = t.quant;
+    char * val = t.val;
     bool match = false;
 
     switch (q) {
       case Plus:
         while (*s != '\0') {
-          if (*val == *s) {
+          if (match_token(s, val)) {
             match = true;
           } else {
             break;
@@ -215,22 +246,21 @@ int match(char *s, char *p) {
           s++;
         }
         if (match) {
-          ti += 1;
+          ti++;
         }
         s++;
         break;
       case Star:
         match = true;
         while (*s != '\0') {
-          if (*val == *s) {
-          } else {
-            break;
-          }
+          if (!match_token(s, val)) break;
+          s++;
         }
-        ti+=1;
+        s++;
+        ti++;
         break;
       default:
-        if (*val == *s) {
+        if (match_token(s, tokens[ti].val)) {
           ti++;
         }
         s++;
@@ -323,14 +353,15 @@ int match2(char * s, char * p) {
 int main(int argc, char * argv[]) {
   ASSERT(match("", "") == TRUE);
   ASSERT(match("a", "") == FALSE);
-  
+  //
   ASSERT(match("ab", "b") == TRUE);
   ASSERT(match("ab", "a") == TRUE);
   ASSERT(match("bab", "a") == TRUE);
   ASSERT(match("b", "a") == FALSE);
-
+  //
   ASSERT(match("aa", "a+") == TRUE);
   ASSERT(match("b", "a+") == FALSE);
+  ASSERT(match("b", "a*") == TRUE);
   ASSERT(match("a", "a*") == TRUE);
   ASSERT(match("aa", "a*") == TRUE);
   ASSERT(match("bca", "a*") == TRUE);
@@ -338,20 +369,22 @@ int main(int argc, char * argv[]) {
   // TODO 
   // ASSERT(match("", "a*") == TRUE);
 
-  // ASSERT(match(".", "\\.") == TRUE);
-  //
-  // // character class 
-  // ASSERT(match("a1", "\\d") == TRUE);
-  // ASSERT(match("1a", "\\d") == TRUE);
-  // ASSERT(match("a1a", "\\d") == TRUE);
-  // ASSERT(match("a", "\\d") == FALSE);
-  // ASSERT(match("\\d", "\\\\d") == TRUE);
-  // ASSERT(match("a", "\\d") == FALSE);
-  //
-  // ASSERT(match("abc", "[a]") == TRUE);
-  // ASSERT(match("abc", "[e]") == FALSE);
-  // ASSERT(match("abc", "[^abc]") == FALSE);
-  // ASSERT(match("def", "[^abc]") == TRUE);
+  ASSERT(match(".", "\\.") == TRUE);
+
+  // character class 
+  ASSERT(match("a1", "\\d") == TRUE);
+  ASSERT(match("1a", "\\d") == TRUE);
+  ASSERT(match("a1a", "\\d") == TRUE);
+  ASSERT(match("a", "\\d") == FALSE);
+  ASSERT(match("\\d", "\\\\d") == TRUE);
+  match("\\d", "\\\\d");
+  ASSERT(match("a", "\\d") == FALSE);
+
+  ASSERT(match("abc", "[a]") == TRUE);
+  ASSERT(match("abc", "[e]") == FALSE);
+
+  ASSERT(match("abc", "[^abc]") == FALSE);
+  ASSERT(match("def", "[^abc]") == TRUE);
   //
   // // \d apple should match "1 apple", but not "1 orange".
   // ASSERT(match("1 apple", "\\d apple") == TRUE);
