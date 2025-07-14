@@ -198,16 +198,23 @@ bool match_token(char * s, char * tval) {
   }
   else if (*tval == '[') {
     tval++;
+    bool is_negative_group = false;
+    if (*tval == '^') {
+      is_negative_group = true;
+      tval++;
+    }
     char * s_iter;
     while (*tval != ']') {
       s_iter = s;
       while (*s_iter != '\0') {
-        if (match_token(s_iter, tval)) return true;
+        if (match_token(s_iter, tval)) {
+          return !is_negative_group;
+        }
         s_iter++;
       }
       tval++;
     }
-    return false;
+    return is_negative_group;
   }
   else {
     return *s == *tval;
@@ -218,15 +225,15 @@ int match(char *s, char *p) {
   if (strlen(s) == 0 && strlen(p) == 0) return TRUE;
   if (strlen(s) > 0 && strlen(p) == 0) return FALSE;
 
+  bool has_start_anchor = *p == '^';
+  if (has_start_anchor) {
+    p++;
+  }
+
   token_array arr = *tokenize(p);
   token * tokens = arr.t; 
-  // for (int i = 0; i < arr.length; i++) {
-  //   printf("val = %s, quant = %d\n", tokens[i].val, tokens[i].quant);
-  // }
 
-  // match all tokens in arr against string s
-  //
-  // aba a 
+  bool has_end_anchor = *(p + strlen(p)-1) == '$';
 
   int ti = 0;
   while (ti < arr.length && *s != '\0') {
@@ -234,6 +241,10 @@ int match(char *s, char *p) {
     quantifier q = t.quant;
     char * val = t.val;
     bool match = false;
+
+    if (*val == '$') {
+      ti++;
+    }
 
     switch (q) {
       case Plus:
@@ -261,12 +272,22 @@ int match(char *s, char *p) {
         break;
       default:
         if (match_token(s, tokens[ti].val)) {
+          match = true;
           ti++;
         }
         s++;
     }
+    if (has_start_anchor && !match) {
+      return false;
+    }
   }
-  return ti == arr.length;
+    if (*val == '$') {
+      ti++;
+    }
+  return has_end_anchor
+  ? *s == '\0' && ti == arr.length
+  : ti == arr.length;
+  
 }
 
 int match2(char * s, char * p) {
@@ -386,25 +407,25 @@ int main(int argc, char * argv[]) {
   ASSERT(match("abc", "[^abc]") == FALSE);
   ASSERT(match("def", "[^abc]") == TRUE);
   //
-  // // \d apple should match "1 apple", but not "1 orange".
-  // ASSERT(match("1 apple", "\\d apple") == TRUE);
-  // ASSERT(match("1 orange", "\\d apple") == FALSE);
-  // // \d\d\d apple should match_escape_seqh "100 apples", but not "1 apple".
-  // ASSERT(match("100 apples", "\\d\\d\\d apple") == TRUE);
-  // ASSERT(match("1 apple", "\\d\\d\\d apple") == FALSE);
-  // // \d \w\w\ws should match "3 dogs" and "4 cats" but not "1 dog" (because the "s" is not present at the end).
-  // ASSERT(match("3 dogs", "\\d \\w\\w\\ws") == TRUE);
-  // ASSERT(match("4 cats", "\\d \\w\\w\\ws") == TRUE);
-  // ASSERT(match("1 dog", "\\d \\w\\w\\ws") == FALSE);
+  // \d apple should match "1 apple", but not "1 orange".
+  ASSERT(match("1 apple", "\\d apple") == TRUE);
+  ASSERT(match("1 orange", "\\d apple") == FALSE);
+  // \d\d\d apple should match_escape_seqh "100 apples", but not "1 apple".
+  ASSERT(match("100 apples", "\\d\\d\\d apple") == TRUE);
+  ASSERT(match("1 apple", "\\d\\d\\d apple") == FALSE);
+  // \d \w\w\ws should match "3 dogs" and "4 cats" but not "1 dog" (because the "s" is not present at the end).
+  ASSERT(match("3 dogs", "\\d \\w\\w\\ws") == TRUE);
+  ASSERT(match("4 cats", "\\d \\w\\w\\ws") == TRUE);
+  ASSERT(match("1 dog", "\\d \\w\\w\\ws") == FALSE);
   //
-  // ASSERT(match("slogs", "^slog") == TRUE);
-  // ASSERT(match("slogs", "^log") == FALSE);
-  //
-  // ASSERT(match("slogs", "logs$") == TRUE);
-  // ASSERT(match("slogs", "log$") == FALSE);
-  //
-  // ASSERT(match("slogs", "^slogs$") == TRUE);
-  // ASSERT(match("log", "^slogs$") == FALSE);
+  ASSERT(match("slogs", "^slog") == TRUE);
+  ASSERT(match("slogs", "^log") == FALSE);
+
+  ASSERT(match("slogs", "logs$") == TRUE);
+  ASSERT(match("slogs", "log$") == FALSE);
+
+  ASSERT(match("slogs", "^slogs$") == TRUE);
+  ASSERT(match("log", "^slogs$") == FALSE);
 
   // if (argc != 2) {
   //   printf("USAGE: crepe PATTERN\n");
