@@ -8,12 +8,6 @@
 #define TRUE 1
 #define FALSE 0
 
-typedef enum quant {
-  Single,
-  Plus,
-  Star
-} quant;
-
 #define ASSERT(cond) \
   do { \
     if (!(cond)) { \
@@ -43,9 +37,121 @@ void match_escape_seq(char ** s, char c) {
   }
 }
 
+typedef enum quantifier {
+  Single,
+  Plus,
+  Star
+} quanitifer;
+
+typedef struct token {
+  char * val; 
+  quanitifer quant;
+} token;
+
+typedef struct token_array {
+  token * t;
+  int length;
+} token_array;
+
+char * mk_character_class(char class) {
+  char * c = malloc(sizeof(char) * 3);
+  c[0] = '\\';
+  c[1] = class;
+  c[2] = '\0';
+  return c;
+}
+
+char * mk_simple(char val) {
+  char * c = malloc(sizeof(char) * 2);
+  c[0] = val;
+  c[1] = '\0';
+  return c;
+}
+
+char * mk_character_group(char * pattern) {
+  int end = 0;
+  // [a]
+
+  char pcur;
+  do {
+    pcur = pattern[end];
+    if (pcur == ']' && end < 2) {
+      printf("ERROR: empty character group");
+      exit(1);
+    }
+    end++;
+  } while (pcur != ']');
+
+  char * ptr = malloc(sizeof(char) * (end + 1));
+  
+  for (int i = 0; i <= end; i++) {
+    ptr[i] = pattern[i];
+    if (i == end) {
+      ptr[i] = '\0';
+    }
+  }
+
+  return ptr; 
+}
+
+token_array * tokenize(char * pattern) {
+  // "abc\0";
+  token * t = malloc(sizeof(token) * (strlen(pattern)));
+  int t_index = 0; 
+  int p_index = 0;
+
+  while (pattern[p_index] != '\0') {
+
+    if (pattern[p_index] == '*') {
+      if (t_index > 0) {
+        t[t_index-1].quant = Star;
+      }
+      p_index++;
+    }
+    else if (pattern[p_index] == '+') {
+      if (t_index > 0) {
+        t[t_index-1].quant = Plus;
+      }
+      p_index++;
+    }
+    else {
+      if (pattern[p_index] == '[') {
+        t[t_index].val = mk_character_group(pattern);
+        t[t_index].quant = Single;
+        for (;*pattern != ']'; pattern++);
+      }
+      else if (pattern[p_index] == '\\') {
+        p_index++;
+        switch (pattern[p_index]) {
+          case 'd':
+            t[t_index].val = mk_character_class('d');
+            break;
+          case 'w':
+            t[t_index].val = mk_character_class('w');
+            break;
+          default:
+            t[t_index].val = mk_simple(pattern[p_index]);
+            t[t_index].quant = Single;
+        }
+      }
+      else {
+        t[t_index].val = mk_simple(pattern[p_index]);
+        t[t_index].quant = Single;
+      }
+      t_index++;
+      p_index++;
+      }
+
+  }
+  token_array * arr = malloc(sizeof(token_array));
+  arr->t = t;
+  arr->length = t_index;
+  return arr;
+}
+
+
 int match_group(char * s, char * g) {
   char * g_iter = g;
-  quant q = Single;
 
   // check for unclosed character group
   while (*g_iter != ']') {
@@ -60,17 +166,6 @@ int match_group(char * s, char * g) {
   if (*g_iter == ']') {
     printf("ERROR: empty character group");
     exit(1);
-  }
-
-  // check for any quantifiers
-  g_iter = g; 
-  for (;g_iter != ']', g_iter++);
-  switch (*(g_iter+1)) {
-    case '+':
-      q = Plus;
-      break;
-    case '*':
-      q = Star;
   }
 
   g_iter = g;
@@ -90,6 +185,10 @@ int match_group(char * s, char * g) {
   }
   return FALSE;
 } 
+
+int match2(char *s, char *p) {
+  token_array * arr = tokenize(p);
+}
 
 int match(char * s, char * p) {
   // empty p does not match any string
@@ -137,6 +236,23 @@ int match(char * s, char * p) {
     
     // exact match
     else {
+      // switch (NEXT(p)) {
+      //   case '+':
+      //     match = FALSE;
+      //     while (*s == *p) {
+      //       match = TRUE;
+      //       s++; 
+      //     } 
+      //   case '*':
+      //     match = TRUE;
+      //     while (*s == *p) {
+      //       s++; 
+      //     } 
+      //     break;
+      //   default: 
+      //     match = *p == *s;
+      //     break;
+      // }
       match = *p == *s;
     }
 
@@ -199,12 +315,13 @@ int main(int argc, char * argv[]) {
   ASSERT(match("slogs", "^slogs$") == TRUE);
   ASSERT(match("log", "^slogs$") == FALSE);
 
-  pattern_atom arr[1024];
-  char * pattern = "^Hello World";
-  parse_pattern(pattern, arr);
+  ASSERT(match("aa", "a+") == TRUE);
+  ASSERT(match("b", "a+") == FALSE);
 
-  printf("start = %s, end = %s, ")
-  
+  ASSERT(match("", "a*") == TRUE);
+  ASSERT(match("a", "a*") == TRUE);
+  ASSERT(match("aa", "a*") == TRUE);
+  ASSERT(match("bca", "a*") == TRUE);
 
   // if (argc != 2) {
   //   printf("USAGE: crepe PATTERN\n");
