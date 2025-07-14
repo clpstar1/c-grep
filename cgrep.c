@@ -8,6 +8,11 @@
 #define TRUE 1
 #define FALSE 0
 
+typedef enum quant {
+  Single,
+  Plus,
+  Star
+} quant;
 
 #define ASSERT(cond) \
   do { \
@@ -40,6 +45,7 @@ void match_escape_seq(char ** s, char c) {
 
 int match_group(char * s, char * g) {
   char * g_iter = g;
+  quant q = Single;
 
   // check for unclosed character group
   while (*g_iter != ']') {
@@ -54,6 +60,17 @@ int match_group(char * s, char * g) {
   if (*g_iter == ']') {
     printf("ERROR: empty character group");
     exit(1);
+  }
+
+  // check for any quantifiers
+  g_iter = g; 
+  for (;g_iter != ']', g_iter++);
+  switch (*(g_iter+1)) {
+    case '+':
+      q = Plus;
+      break;
+    case '*':
+      q = Star;
   }
 
   g_iter = g;
@@ -79,27 +96,35 @@ int match(char * s, char * p) {
   if (strlen(s) == 0 && strlen(p) == 0) return TRUE;
   if (strlen(s) > 0 && strlen(p) == 0) return FALSE;
 
-  while (*p != '\0' && *s != '\0') {
+  int has_start_anchor = *p == '^';
+  if (has_start_anchor) {
+    p++;
+  }
+
+  int has_end_anchor = *(p + strlen(p)-1) == '$';
+  char end = has_end_anchor 
+    ? '$'
+    : '\0';
+
+  while (*p != end && *s != '\0') {
+    int match = FALSE;
 
     if (*p == '[') {
       int is_negative_group = FALSE;
+
       if (*(p+1) == '^') {
         is_negative_group = TRUE;
       }
-      // match: advance pattern
-      int match = match_group(s, p);
+
+      match = match_group(s, p);
       if (is_negative_group) {
         match = !match;
       }
 
       if (match) {
-        // if found, discard the rest of the group
-        while (*p != ']') {
-          p++;
-        }
-        p++;
+        // discard the rest of the group
+        for(;*p != ']'; p++);
       }
-      s++;
     }
 
     else if (*p == '\\') {
@@ -107,32 +132,38 @@ int match(char * s, char * p) {
       p++;
       match_escape_seq(&s, *p);
       // match: advance pattern 
-      if (*s != '\0') {
-        p++;
-      }
-      s++;
+      match = *s != '\0';
     }
     
     // exact match
-    else if (*p == *s) {
-      p++; s++;
-    } else {
-      s++;
+    else {
+      match = *p == *s;
     }
+
+    if (match) {
+      p++;
+    } else {
+      if (has_start_anchor) return FALSE;
+    }
+    s++;
   }
 
-  return *p == '\0';
+  if (has_end_anchor) {
+    return *p == end && *s == '\0';
+  }
+
+  return *p == end;
 }
 
 int main(int argc, char * argv[]) {
   ASSERT(match("", "") == TRUE);
+  ASSERT(match("a", "") == FALSE);
   
   ASSERT(match("ab", "b") == TRUE);
   ASSERT(match("ab", "a") == TRUE);
   ASSERT(match("bab", "a") == TRUE);
   ASSERT(match("b", "a") == FALSE);
 
-  // match characters not in a character class literally
   ASSERT(match(".", "\\.") == TRUE);
 
   // character class 
@@ -147,6 +178,33 @@ int main(int argc, char * argv[]) {
   ASSERT(match("abc", "[e]") == FALSE);
   ASSERT(match("abc", "[^abc]") == FALSE);
   ASSERT(match("def", "[^abc]") == TRUE);
+
+  // \d apple should match "1 apple", but not "1 orange".
+  ASSERT(match("1 apple", "\\d apple") == TRUE);
+  ASSERT(match("1 orange", "\\d apple") == FALSE);
+  // \d\d\d apple should match_escape_seqh "100 apples", but not "1 apple".
+  ASSERT(match("100 apples", "\\d\\d\\d apple") == TRUE);
+  ASSERT(match("1 apple", "\\d\\d\\d apple") == FALSE);
+  // \d \w\w\ws should match "3 dogs" and "4 cats" but not "1 dog" (because the "s" is not present at the end).
+  ASSERT(match("3 dogs", "\\d \\w\\w\\ws") == TRUE);
+  ASSERT(match("4 cats", "\\d \\w\\w\\ws") == TRUE);
+  ASSERT(match("1 dog", "\\d \\w\\w\\ws") == FALSE);
+
+  ASSERT(match("slogs", "^slog") == TRUE);
+  ASSERT(match("slogs", "^log") == FALSE);
+
+  ASSERT(match("slogs", "logs$") == TRUE);
+  ASSERT(match("slogs", "log$") == FALSE);
+
+  ASSERT(match("slogs", "^slogs$") == TRUE);
+  ASSERT(match("log", "^slogs$") == FALSE);
+
+  pattern_atom arr[1024];
+  char * pattern = "^Hello World";
+  parse_pattern(pattern, arr);
+
+  printf("start = %s, end = %s, ")
+  
 
   // if (argc != 2) {
   //   printf("USAGE: crepe PATTERN\n");
