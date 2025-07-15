@@ -6,8 +6,6 @@
 #include <stdbool.h>
 
 #define BUFSZ 1024
-#define TRUE 1
-#define FALSE 0
 
 #define ASSERT(cond) \
   do { \
@@ -166,9 +164,9 @@ bool match_token(char * s, char * tval) {
 }
 
 // a, a$
-int match(char *s, char *p) {
-  if (strlen(s) == 0 && strlen(p) == 0) return TRUE;
-  if (strlen(s) > 0 && strlen(p) == 0) return FALSE;
+bool match(char *s, char *p) {
+  if (strlen(s) == 0 && strlen(p) == 0) return true;
+  if (strlen(s) > 0 && strlen(p) == 0) return false;
 
   bool has_start_anchor = *p == '^';
   if (has_start_anchor) {
@@ -228,63 +226,63 @@ int match(char *s, char *p) {
 }
 
 void test_char_only() {
-  ASSERT(match("", "") == TRUE);
-  ASSERT(match("a", "") == FALSE);
+  ASSERT(match("", "") == true);
+  ASSERT(match("a", "") == false);
   //
-  ASSERT(match("ab", "b") == TRUE);
-  ASSERT(match("ab", "a") == TRUE);
-  ASSERT(match("bab", "a") == TRUE);
-  ASSERT(match("b", "a") == FALSE);
+  ASSERT(match("ab", "b") == true);
+  ASSERT(match("ab", "a") == true);
+  ASSERT(match("bab", "a") == true);
+  ASSERT(match("b", "a") == false);
 
-  ASSERT(match("a\n", "a") == TRUE);
+  ASSERT(match("a\n", "a") == true);
 }
 
 void test_character_class() {
-  ASSERT(match("a1", "\\d") == TRUE);
-  ASSERT(match("1a", "\\d") == TRUE);
-  ASSERT(match("a1a", "\\d") == TRUE);
-  ASSERT(match("a", "\\d") == FALSE);
-  ASSERT(match("\\d", "\\\\d") == TRUE);
-  ASSERT(match("a", "\\d") == FALSE);
+  ASSERT(match("a1", "\\d") == true);
+  ASSERT(match("1a", "\\d") == true);
+  ASSERT(match("a1a", "\\d") == true);
+  ASSERT(match("a", "\\d") == false);
+  ASSERT(match("\\d", "\\\\d") == true);
+  ASSERT(match("a", "\\d") == false);
 
-  ASSERT(match("1 apple", "\\d apple") == TRUE);
-  ASSERT(match("1 orange", "\\d apple") == FALSE);
-  ASSERT(match("100 apples", "\\d\\d\\d apple") == TRUE);
-  ASSERT(match("1 apple", "\\d\\d\\d apple") == FALSE);
-  ASSERT(match("3 dogs", "\\d \\w\\w\\ws") == TRUE);
-  ASSERT(match("4 cats", "\\d \\w\\w\\ws") == TRUE);
-  ASSERT(match("1 dog", "\\d \\w\\w\\ws") == FALSE);
+  ASSERT(match("1 apple", "\\d apple") == true);
+  ASSERT(match("1 orange", "\\d apple") == false);
+  ASSERT(match("100 apples", "\\d\\d\\d apple") == true);
+  ASSERT(match("1 apple", "\\d\\d\\d apple") == false);
+  ASSERT(match("3 dogs", "\\d \\w\\w\\ws") == true);
+  ASSERT(match("4 cats", "\\d \\w\\w\\ws") == true);
+  ASSERT(match("1 dog", "\\d \\w\\w\\ws") == false);
 
-  ASSERT(match(".", "\\.") == TRUE);
+  ASSERT(match(".", "\\.") == true);
 }
 
 void test_groups() {
-  ASSERT(match("abc", "[a]") == TRUE);
-  ASSERT(match("abc", "[e]") == FALSE);
+  ASSERT(match("abc", "[a]") == true);
+  ASSERT(match("abc", "[e]") == false);
 
-  ASSERT(match("abc", "[^abc]") == FALSE);
-  ASSERT(match("def", "[^abc]") == TRUE);
+  ASSERT(match("abc", "[^abc]") == false);
+  ASSERT(match("def", "[^abc]") == true);
 }
 
 void test_anchors() {
-  ASSERT(match("slogs", "^slog") == TRUE);
-  ASSERT(match("slogs", "^log") == FALSE);
-  ASSERT(match("a", "a$") == TRUE);
-  ASSERT(match("slogs", "log$") == FALSE);
-  ASSERT(match("slogs", "^slogs$") == TRUE);
-  ASSERT(match("log", "^slogs$") == FALSE);
+  ASSERT(match("slogs", "^slog") == true);
+  ASSERT(match("slogs", "^log") == false);
+  ASSERT(match("a", "a$") == true);
+  ASSERT(match("slogs", "log$") == false);
+  ASSERT(match("slogs", "^slogs$") == true);
+  ASSERT(match("log", "^slogs$") == false);
 }
 
 void test_quantifiers() {
-  ASSERT(match("aa", "a+") == TRUE);
-  ASSERT(match("b", "a+") == FALSE);
-  ASSERT(match("b", "a*") == TRUE);
-  ASSERT(match("a", "a*") == TRUE);
-  ASSERT(match("aa", "a*") == TRUE);
-  ASSERT(match("bca", "a*") == TRUE);
+  ASSERT(match("aa", "a+") == true);
+  ASSERT(match("b", "a+") == false);
+  ASSERT(match("b", "a*") == true);
+  ASSERT(match("a", "a*") == true);
+  ASSERT(match("aa", "a*") == true);
+  ASSERT(match("bca", "a*") == true);
 
   // TODO 
-  // ASSERT(match("", "a*") == TRUE);
+  // ASSERT(match("", "a*") == true);
 }
 
 void run_test_cases() {
@@ -314,11 +312,11 @@ int main(int argc, char * argv[]) {
 
   if (buf[len_line-1] == '\n') {
     if (match(buf, argv[1])) {
-      return TRUE;
+      return true;
     }
   } else {
     printf("ERROR: line too long got %d max = %d", len_line, BUFSZ);
-    return FALSE;
+    return false;
   }
 }
   
