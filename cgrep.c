@@ -136,6 +136,7 @@ token_array * tokenize(char * pattern) {
 
 
 bool match_token(char * s, char * tval) {
+  if (*tval == '.') return true;
   if (*tval == '\\') {
     tval++;
     // printf("s = %s, tval = %s\n", s, tval);
@@ -216,6 +217,10 @@ bool match(char *s, char *p) {
   return has_end_anchor 
   ? ti == arr.length && *s == '\0'
   : ti == arr.length;
+}
+
+void test_wildcard() {
+  ASSERT(match("doooooooog", "d.+g"));
 }
 
 void test_char_only() {
