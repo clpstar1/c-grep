@@ -165,6 +165,7 @@ bool match_token(char * s, char * tval) {
   }
 }
 
+// a, a$
 int match(char *s, char *p) {
   if (strlen(s) == 0 && strlen(p) == 0) return TRUE;
   if (strlen(s) > 0 && strlen(p) == 0) return FALSE;
@@ -185,10 +186,6 @@ int match(char *s, char *p) {
     quantifier q = t.quant;
     char * val = t.val;
     bool match = false;
-
-    if (*val == '$') {
-      ti++;
-    }
 
     switch (q) {
       case Plus:
@@ -225,16 +222,12 @@ int match(char *s, char *p) {
       return false;
     }
   }
-    if (*val == '$') {
-      ti++;
-    }
   return has_end_anchor
   ? *s == '\0' && ti == arr.length
   : ti == arr.length;
-  
 }
 
-int main(int argc, char * argv[]) {
+void test_char_only() {
   ASSERT(match("", "") == TRUE);
   ASSERT(match("a", "") == FALSE);
   //
@@ -242,7 +235,47 @@ int main(int argc, char * argv[]) {
   ASSERT(match("ab", "a") == TRUE);
   ASSERT(match("bab", "a") == TRUE);
   ASSERT(match("b", "a") == FALSE);
-  //
+
+  ASSERT(match("a\n", "a") == TRUE);
+}
+
+void test_character_class() {
+  ASSERT(match("a1", "\\d") == TRUE);
+  ASSERT(match("1a", "\\d") == TRUE);
+  ASSERT(match("a1a", "\\d") == TRUE);
+  ASSERT(match("a", "\\d") == FALSE);
+  ASSERT(match("\\d", "\\\\d") == TRUE);
+  ASSERT(match("a", "\\d") == FALSE);
+
+  ASSERT(match("1 apple", "\\d apple") == TRUE);
+  ASSERT(match("1 orange", "\\d apple") == FALSE);
+  ASSERT(match("100 apples", "\\d\\d\\d apple") == TRUE);
+  ASSERT(match("1 apple", "\\d\\d\\d apple") == FALSE);
+  ASSERT(match("3 dogs", "\\d \\w\\w\\ws") == TRUE);
+  ASSERT(match("4 cats", "\\d \\w\\w\\ws") == TRUE);
+  ASSERT(match("1 dog", "\\d \\w\\w\\ws") == FALSE);
+
+  ASSERT(match(".", "\\.") == TRUE);
+}
+
+void test_groups() {
+  ASSERT(match("abc", "[a]") == TRUE);
+  ASSERT(match("abc", "[e]") == FALSE);
+
+  ASSERT(match("abc", "[^abc]") == FALSE);
+  ASSERT(match("def", "[^abc]") == TRUE);
+}
+
+void test_anchors() {
+  ASSERT(match("slogs", "^slog") == TRUE);
+  ASSERT(match("slogs", "^log") == FALSE);
+  ASSERT(match("a", "a$") == TRUE);
+  ASSERT(match("slogs", "log$") == FALSE);
+  ASSERT(match("slogs", "^slogs$") == TRUE);
+  ASSERT(match("log", "^slogs$") == FALSE);
+}
+
+void test_quantifiers() {
   ASSERT(match("aa", "a+") == TRUE);
   ASSERT(match("b", "a+") == FALSE);
   ASSERT(match("b", "a*") == TRUE);
@@ -252,61 +285,41 @@ int main(int argc, char * argv[]) {
 
   // TODO 
   // ASSERT(match("", "a*") == TRUE);
+}
 
-  ASSERT(match(".", "\\.") == TRUE);
+void run_test_cases() {
+  test_char_only();
+  test_character_class();
+  test_groups();
+  test_anchors();
+  test_quantifiers();
+}
 
-  // character class 
-  ASSERT(match("a1", "\\d") == TRUE);
-  ASSERT(match("1a", "\\d") == TRUE);
-  ASSERT(match("a1a", "\\d") == TRUE);
-  ASSERT(match("a", "\\d") == FALSE);
-  ASSERT(match("\\d", "\\\\d") == TRUE);
-  match("\\d", "\\\\d");
-  ASSERT(match("a", "\\d") == FALSE);
+int main(int argc, char * argv[]) {
 
-  ASSERT(match("abc", "[a]") == TRUE);
-  ASSERT(match("abc", "[e]") == FALSE);
+  if (argc != 2) {
+    printf("USAGE: string | cgrep PATTERN\n");
+    return 1;
+  }
 
-  ASSERT(match("abc", "[^abc]") == FALSE);
-  ASSERT(match("def", "[^abc]") == TRUE);
-  //
-  // \d apple should match "1 apple", but not "1 orange".
-  ASSERT(match("1 apple", "\\d apple") == TRUE);
-  ASSERT(match("1 orange", "\\d apple") == FALSE);
-  // \d\d\d apple should match_escape_seqh "100 apples", but not "1 apple".
-  ASSERT(match("100 apples", "\\d\\d\\d apple") == TRUE);
-  ASSERT(match("1 apple", "\\d\\d\\d apple") == FALSE);
-  // \d \w\w\ws should match "3 dogs" and "4 cats" but not "1 dog" (because the "s" is not present at the end).
-  ASSERT(match("3 dogs", "\\d \\w\\w\\ws") == TRUE);
-  ASSERT(match("4 cats", "\\d \\w\\w\\ws") == TRUE);
-  ASSERT(match("1 dog", "\\d \\w\\w\\ws") == FALSE);
-  //
-  ASSERT(match("slogs", "^slog") == TRUE);
-  ASSERT(match("slogs", "^log") == FALSE);
+  char * pattern = argv[1];
+  if (strcmp(pattern, "test") == 0) {
+    run_test_cases();
+    exit(0);
+  }
 
-  ASSERT(match("slogs", "logs$") == TRUE);
-  ASSERT(match("slogs", "log$") == FALSE);
+  char buf[BUFSZ];
+  fgets(buf, sizeof buf, stdin);
+  int len_line = strlen(buf);
 
-  ASSERT(match("slogs", "^slogs$") == TRUE);
-  ASSERT(match("log", "^slogs$") == FALSE);
-
-  // if (argc != 2) {
-  //   printf("USAGE: crepe PATTERN\n");
-  //   return 1;
-  // }
-  //
-  // char buf[BUFSZ];
-  // fgets(buf, sizeof buf, stdin);
-  // int len_line = strlen(buf);
-  //
-  // if (buf[len_line-1] == '\n') {
-  //   if (match(buf, argv[1])) {
-  //     return TRUE;
-  //   }
-  // } else {
-  //   printf("ERROR: line too long got %d max = %d", len_line, BUFSZ);
-  //   return FALSE;
-  // }
+  if (buf[len_line-1] == '\n') {
+    if (match(buf, argv[1])) {
+      return TRUE;
+    }
+  } else {
+    printf("ERROR: line too long got %d max = %d", len_line, BUFSZ);
+    return FALSE;
+  }
 }
   
 
