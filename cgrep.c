@@ -139,7 +139,6 @@ bool match_token(char * s, char * tval) {
   if (*tval == '.') return true;
   if (*tval == '\\') {
     tval++;
-    // printf("s = %s, tval = %s\n", s, tval);
     switch (*tval) {
       case 'd': return isdigit(*s);
       case 'w': return isalpha(*s);
@@ -171,7 +170,6 @@ bool match_token(char * s, char * tval) {
   }
 }
 
-// a, a$
 bool match(char *s, char *p) {
   if (strlen(s) == 0 && strlen(p) == 0) return true;
   if (strlen(s) > 0 && strlen(p) == 0) return false;
@@ -185,42 +183,81 @@ bool match(char *s, char *p) {
 
   bool first_match = false;
 
+  // for (int i = 0; i < arr.length; i++) {
+  //   printf("val = %s, quant = %d\n", tokens[i].val, tokens[i].quant);
+  // }
+
   while (ti < arr.length && *s != '\0') {
     token t = tokens[ti];
     quantifier q = t.quant;
     char * val = t.val;
     bool match = false;
 
+    // d...g, ^d\.+g$
+    // d...g, d,\.+,g
+    // ...g, \.+,g
+    // ..g, \.+,g
+    // .g, \.+,g
+    // g, \.+,g
+    // , \.+,g
+    //
+    // dog d.+g
+    // og .+g
+    // g .+g 
+    //  
+    char * next = NULL; 
+    if (ti+1 < arr.length) {
+      next = tokens[ti+1].val;
+    }
+
     switch (q) {
       case Plus:
-        while (*s != '\0' && (match = match_token(s++, val) == true));
+        match = match_token(s, val);
+        if (match) {
+          s++;
+          while (*s != '\0' && match_token(s, val)) {
+            if (next != NULL && match_token(s, next)) break; 
+            s++;
+          }
+          ti++;
+        } else {
+          s++;
+        }
         break;
       case Star:
         match = true;
-        while (*s != '\0' && match_token(s++, val));
+        while (*s != '\0' && match_token(s, val)) {
+          if (next != NULL && match_token(s, next)) break; 
+          s++;
+        }
+        ti++;
         break;
       default:
         match = match_token(s, val);
+        if (match) {
+          ti++;
+        }
+        s++;
         break;
     }
+
     if (match && !first_match) {
       first_match = true;
     }
 
     if (has_end_anchor && first_match && !match) return false;
     if (has_start_anchor && !match) return false;
-    if (match) {
-      ti++;
-    }
-    s++;
   }
+  
   return has_end_anchor 
-  ? ti == arr.length && *s == '\0'
-  : ti == arr.length;
+    ? ti == arr.length && *s == '\0'
+    : ti == arr.length;
 }
 
 void test_wildcard() {
-  ASSERT(match("doooooooog", "d.+g"));
+  ASSERT(match("dog", "d.+g") == true);
+  ASSERT(match("doooooooooooog", "d.*g") == true);
+  ASSERT(match("d..g", "^d\\.+g$") == true);
 }
 
 void test_char_only() {
@@ -290,6 +327,7 @@ void run_test_cases() {
   test_groups();
   test_anchors();
   test_quantifiers();
+  test_wildcard();
 }
 
 int main(int argc, char * argv[]) {
