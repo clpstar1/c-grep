@@ -193,43 +193,43 @@ bool match(char *s, char *p) {
     char * val = t.val;
     bool match = false;
 
-    // d...g, ^d\.+g$
-    // d...g, d,\.+,g
-    // ...g, \.+,g
-    // ..g, \.+,g
-    // .g, \.+,g
-    // g, \.+,g
-    // , \.+,g
-    //
-    // dog d.+g
-    // og .+g
-    // g .+g 
-    //  
     char * next = NULL; 
     if (ti+1 < arr.length) {
       next = tokens[ti+1].val;
     }
 
     switch (q) {
+      // match between 1 and n times 
       case Plus:
         match = match_token(s, val);
-        if (match) {
+        // no match means advance the string but NOT advancing the pattern
+        // - in s = ba and p = a+, 'a+' only matches the second a and b is ignored
+        if (!match) {
           s++;
-          while (*s != '\0' && match_token(s, val)) {
-            if (next != NULL && match_token(s, next)) break; 
-            s++;
-          }
-          ti++;
-        } else {
-          s++;
+          break;
         }
-        break;
-      case Star:
-        match = true;
+        // consume until token no longer matches or s is empty
+        s++;
         while (*s != '\0' && match_token(s, val)) {
+          // if the next token in the pattern also matches our greedy consumption must end
+          // otherwise in the pattern "d.+g" and the string dog, '.+' consumes everything since '.+' also matches 'g'
+          // this would result in the pattern not being fully consumed when the string is fully consumed
           if (next != NULL && match_token(s, next)) break; 
           s++;
         }
+        ti++;
+        break;
+      // match between 0 and n times
+      case Star:
+        // always tree since 0 matches are allowed
+        match = true;
+        // consume until token no longer matches or s is empty
+        while (*s != '\0' && match_token(s, val)) {
+          // see explanation for Plus quantifier
+          if (next != NULL && match_token(s, next)) break; 
+          s++;
+        }
+        // here we can always advance the pattern as every char of s is a positive match
         ti++;
         break;
       default:
@@ -256,8 +256,13 @@ bool match(char *s, char *p) {
 
 void test_wildcard() {
   ASSERT(match("dog", "d.+g") == true);
+  ASSERT(match("dg", "d.+g") == false);
+
   ASSERT(match("doooooooooooog", "d.*g") == true);
+  ASSERT(match("dg", "d.*g") == true);
+
   ASSERT(match("d..g", "^d\\.+g$") == true);
+  ASSERT(match("ad..g", "^d\\.+g$") == false);
 }
 
 void test_char_only() {
@@ -316,9 +321,15 @@ void test_quantifiers() {
   ASSERT(match("a", "a*") == true);
   ASSERT(match("aa", "a*") == true);
   ASSERT(match("bca", "a*") == true);
+  ASSERT(match("ba", "a*") == true);
 
   // TODO 
-  // ASSERT(match("", "a*") == true);
+  ASSERT(match("", "a*") == true);
+}
+
+void test_alternation() {
+  ASSERT(match("cat", "(cat|dog)") == true);
+  ASSERT(match("cat", "(bird|dog)") == false);
 }
 
 void run_test_cases() {
@@ -328,6 +339,7 @@ void run_test_cases() {
   test_anchors();
   test_quantifiers();
   test_wildcard();
+  test_alternation();
 }
 
 int main(int argc, char * argv[]) {
