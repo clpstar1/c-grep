@@ -121,7 +121,6 @@ token_array * tokenize(char * pattern) {
         }
         t[t_index].val = val; 
         t[t_index].quant = Single;
-        printf("%d", alternation_sz);
         p_index += alternation_sz;
       }
       else if (pattern[p_index] == '[') {
@@ -157,6 +156,8 @@ token_array * tokenize(char * pattern) {
   return arr;
 }
 
+bool match(char *s, char *p);
+
 bool match_token(char * s, char * tval) {
   if (*tval == '.') return true;
   if (*tval == '\\') {
@@ -165,6 +166,35 @@ bool match_token(char * s, char * tval) {
       case 'd': return isdigit(*s);
       case 'w': return isalpha(*s);
       default: return *s == *tval;
+    }
+  }
+  // (cat|dog)
+  else if (*tval == '(') {
+    // discard opening paren
+    tval++;
+    char * t_iter = tval;
+    int alternation_token_sz = 0; 
+    char * alternation;
+    while (true) {
+      if (*t_iter == '|') {
+        alternation = malloc(sizeof(char) * alternation_token_sz + 1);
+        memcpy(alternation, tval, alternation_token_sz);
+        alternation[alternation_token_sz] = '\0';
+        if (match(s, alternation)) return true; 
+        alternation_token_sz = 0;
+        t_iter++;
+        tval = t_iter;
+      }
+      if (*t_iter == ')') {
+        alternation = malloc(sizeof(char) * alternation_token_sz + 1);
+        memcpy(alternation, tval, alternation_token_sz);
+        alternation[alternation_token_sz] = '\0';
+        return match(s, alternation);
+      }
+      else {
+        alternation_token_sz++;
+        t_iter++;
+      }
     }
   }
   else if (*tval == '[') {
@@ -205,9 +235,9 @@ bool match(char *s, char *p) {
 
   bool first_match = false;
 
-  for (int i = 0; i < arr.length; i++) {
-    printf("val = %s, quant = %d\n", tokens[i].val, tokens[i].quant);
-  }
+  // for (int i = 0; i < arr.length; i++) {
+  //   printf("val = %s, quant = %d\n", tokens[i].val, tokens[i].quant);
+  // }
 
   while (ti < arr.length && *s != '\0') {
     token t = tokens[ti];
@@ -350,7 +380,7 @@ void test_quantifiers() {
 }
 
 void test_alternation() {
-  ASSERT(match("cat", "(cat|dog)") == true);
+  ASSERT(match("catdog", "(cat|dog)+") == true);
   ASSERT(match("cat", "(bird|dog)") == false);
 }
 
