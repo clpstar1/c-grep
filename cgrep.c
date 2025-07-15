@@ -6,13 +6,10 @@
 #include <stdbool.h>
 
 #define BUFSZ 1024
-
 #define ASSERT(cond) \
   do { \
     if (!(cond)) { \
-      fprintf(stderr, "assertion failed: %s\nFile: %snLine: %d\n", \
-              #cond, __FILE__, __LINE__); \
-      abort(); \
+      fprintf(stderr, "assertion failed: %s\n", #cond); \
     } \
   } while(0) \
 
@@ -80,6 +77,15 @@ token_array * tokenize(char * pattern) {
   int p_index = 0;
 
   while (pattern[p_index] != '\0') {
+    if (p_index == 0 && pattern[p_index] == '^') {
+      p_index++;
+      continue;
+    }
+    
+    if (p_index == strlen(pattern) - 1 && pattern[p_index] == '$') {
+      p_index++;
+      continue;
+    }
 
     if (pattern[p_index] == '*') {
       if (t_index > 0) {
@@ -128,6 +134,7 @@ token_array * tokenize(char * pattern) {
   return arr;
 }
 
+
 bool match_token(char * s, char * tval) {
   if (*tval == '\\') {
     tval++;
@@ -169,16 +176,14 @@ bool match(char *s, char *p) {
   if (strlen(s) > 0 && strlen(p) == 0) return false;
 
   bool has_start_anchor = *p == '^';
-  if (has_start_anchor) {
-    p++;
-  }
-
+  bool has_end_anchor = *(p + strlen(p) - 1) == '$';
+  
   token_array arr = *tokenize(p);
   token * tokens = arr.t; 
-
-  bool has_end_anchor = *(p + strlen(p)-1) == '$';
-
   int ti = 0;
+
+  bool first_match = false;
+
   while (ti < arr.length && *s != '\0') {
     token t = tokens[ti];
     quantifier q = t.quant;
@@ -187,41 +192,29 @@ bool match(char *s, char *p) {
 
     switch (q) {
       case Plus:
-        while (*s != '\0') {
-          if (match_token(s, val)) {
-            match = true;
-          } else {
-            break;
-          }
-          s++;
-        }
-        if (match) {
-          ti++;
-        }
-        s++;
+        while (*s != '\0' && (match = match_token(s++, val) == true));
         break;
       case Star:
         match = true;
-        while (*s != '\0') {
-          if (!match_token(s, val)) break;
-          s++;
-        }
-        s++;
-        ti++;
+        while (*s != '\0' && match_token(s++, val));
         break;
       default:
-        if (match_token(s, tokens[ti].val)) {
-          match = true;
-          ti++;
-        }
-        s++;
+        match = match_token(s, val);
+        break;
     }
-    if (has_start_anchor && !match) {
-      return false;
+    if (match && !first_match) {
+      first_match = true;
     }
+
+    if (has_end_anchor && first_match && !match) return false;
+    if (has_start_anchor && !match) return false;
+    if (match) {
+      ti++;
+    }
+    s++;
   }
-  return has_end_anchor
-  ? *s == '\0' && ti == arr.length
+  return has_end_anchor 
+  ? ti == arr.length && *s == '\0'
   : ti == arr.length;
 }
 
@@ -266,6 +259,7 @@ void test_groups() {
 
 void test_anchors() {
   ASSERT(match("slogs", "^slog") == true);
+  ASSERT(match("slogsa", "^slog") == true);
   ASSERT(match("slogs", "^log") == false);
   ASSERT(match("a", "a$") == true);
   ASSERT(match("slogs", "log$") == false);

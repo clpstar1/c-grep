@@ -1,1 +1,1 @@
-gcc cgrep.c -o cgrep && ./cgrep
+gcc cgrep.c -o cgrep && ./cgrep test
