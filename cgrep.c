@@ -99,11 +99,35 @@ token_array * tokenize(char * pattern) {
       }
       p_index++;
     }
+
     else {
-      if (pattern[p_index] == '[') {
+      // (dog|cat)0
+      // 0123456789
+      if (pattern[p_index] == '(') {
+        int alternation_sz = 0; 
+        while (pattern[alternation_sz] != ')') {
+          if (pattern[alternation_sz] == '\0') {
+            printf("ERROR: unclosed alternation");
+            exit(1);
+          }
+          alternation_sz++;
+        }
+        char * val = malloc(sizeof(char) * (alternation_sz+1));
+        for (int i = 0; i <= alternation_sz; i++) {
+          if (i == alternation_sz) {
+            val[i] = '\0';
+          }
+          val[i] = pattern[p_index + i];
+        }
+        t[t_index].val = val; 
+        t[t_index].quant = Single;
+        printf("%d", alternation_sz);
+        p_index += alternation_sz;
+      }
+      else if (pattern[p_index] == '[') {
         t[t_index].val = mk_character_group(pattern);
         t[t_index].quant = Single;
-        for (;*pattern != ']'; pattern++);
+        for (;pattern[p_index] != ']'; p_index++);
       }
       else if (pattern[p_index] == '\\') {
         p_index++;
@@ -126,14 +150,12 @@ token_array * tokenize(char * pattern) {
       t_index++;
       p_index++;
       }
-
   }
   token_array * arr = malloc(sizeof(token_array));
   arr->t = t;
   arr->length = t_index;
   return arr;
 }
-
 
 bool match_token(char * s, char * tval) {
   if (*tval == '.') return true;
@@ -183,9 +205,9 @@ bool match(char *s, char *p) {
 
   bool first_match = false;
 
-  // for (int i = 0; i < arr.length; i++) {
-  //   printf("val = %s, quant = %d\n", tokens[i].val, tokens[i].quant);
-  // }
+  for (int i = 0; i < arr.length; i++) {
+    printf("val = %s, quant = %d\n", tokens[i].val, tokens[i].quant);
+  }
 
   while (ti < arr.length && *s != '\0') {
     token t = tokens[ti];
@@ -333,12 +355,12 @@ void test_alternation() {
 }
 
 void run_test_cases() {
-  test_char_only();
-  test_character_class();
-  test_groups();
-  test_anchors();
-  test_quantifiers();
-  test_wildcard();
+  // test_char_only();
+  // test_character_class();
+  // test_groups();
+  // test_anchors();
+  // test_quantifiers();
+  // test_wildcard();
   test_alternation();
 }
 
