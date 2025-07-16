@@ -2,12 +2,7 @@
 #include <string.h>
 #include <stdlib.h>
 #include <ctype.h>
-#include <assert.h>
-#include <ctype.h>
 #include <stdbool.h>
-#include <stdio.h>
-#include <stdlib.h>
-#include <string.h>
 
 #define BUFSZ 1024
 #define ASSERT(cond)                                                           \
@@ -39,7 +34,7 @@ char * mk_character_class(char class) {
   return c;
 }
 
-char * mk_simple(char val) {
+char * mk_character(char val) {
   char * c = malloc(sizeof(char) * 2);
   c[0] = val;
   c[1] = '\0';
@@ -103,6 +98,9 @@ token_array * tokenize(char * pattern) {
     }
 
     else {
+      token * tcur = &t[t_index];
+      tcur->quant = Single;
+
       if (pattern[p_index] == '(') {
         int alternation_sz = 0; 
         while (pattern[alternation_sz] != ')') {
@@ -119,36 +117,32 @@ token_array * tokenize(char * pattern) {
           }
           val[i] = pattern[p_index + i];
         }
-        t[t_index].val = val; 
-        t[t_index].quant = Single;
+        tcur->val = val; 
         p_index += alternation_sz;
       }
       else if (pattern[p_index] == '[') {
-        t[t_index].val = mk_character_group(pattern);
-        t[t_index].quant = Single;
+        tcur->val = mk_character_group(pattern);
         for (;pattern[p_index] != ']'; p_index++);
       }
       else if (pattern[p_index] == '\\') {
         p_index++;
         switch (pattern[p_index]) {
           case 'd':
-            t[t_index].val = mk_character_class('d');
+            tcur->val = mk_character_class('d');
             break;
           case 'w':
-            t[t_index].val = mk_character_class('w');
+            tcur->val = mk_character_class('w');
             break;
           default:
-            t[t_index].val = mk_character_class(pattern[p_index]);
-            t[t_index].quant = Single;
+            tcur->val = mk_character_class(pattern[p_index]);
         }
       }
       else {
-        t[t_index].val = mk_simple(pattern[p_index]);
-        t[t_index].quant = Single;
+        tcur->val = mk_character(pattern[p_index]);
       }
       t_index++;
       p_index++;
-      }
+    }
   }
   token_array * arr = malloc(sizeof(token_array));
   arr->t = t;
