@@ -3,21 +3,23 @@
 #include <stdlib.h>
 #include <ctype.h>
 #include <assert.h>
+#include <ctype.h>
 #include <stdbool.h>
+#include <stdio.h>
+#include <stdlib.h>
+#include <string.h>
 
 #define BUFSZ 1024
-#define ASSERT(cond) \
-  do { \
-    if (!(cond)) { \
-      fprintf(stderr, "assertion failed: %s\n", #cond); \
-    } \
-  } while(0) \
+#define ASSERT(cond)                                                           \
+  do {                                                                         \
+    if (!(cond)) {                                                             \
+      fprintf(stderr, "assertion failed: %s\n", #cond);                        \
+    }                                                                          \
+  } while (0)
 
-typedef enum quantifier {
-  Single,
-  Plus,
-  Star
-} quantifier;
+bool match(char *s, char *p);
+
+typedef enum quantifier { Single, Plus, Star } quantifier;
 
 typedef struct token {
   char * val; 
@@ -101,8 +103,6 @@ token_array * tokenize(char * pattern) {
     }
 
     else {
-      // (dog|cat)0
-      // 0123456789
       if (pattern[p_index] == '(') {
         int alternation_sz = 0; 
         while (pattern[alternation_sz] != ')') {
