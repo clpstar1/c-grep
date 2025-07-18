@@ -12,12 +12,39 @@
     }                                                                          \
   } while (0)
 
+bool match(char *s, char *p);
+
+bool match_slash(char *s, char *p) {
+  bool is_match = false; 
+
+  if (*p == '\0') {
+    printf("ERROR: unterminated escape slash");
+  }
+  switch (*p) {
+    case 'd': 
+      is_match = isdigit(*s);
+      break;
+    case 'w':
+      is_match = isalpha(*s);
+      break;
+    default:
+      is_match = *s == *p;
+  }
+
+  if (is_match) {
+    return match(++s, ++p);
+  }
+  return match(++s, p-1);
+}
+
 bool match(char * s, char *p) {
   bool is_match = false;
   
   if (*p == '\0') return true;  
   if (*s == '\0') return *p == '\0';
-  
+
+  if (*p == '\\') return match_slash(s, ++p);
+
   if (*s == *p) {
     is_match = match(++s, ++p);
   } else {
@@ -38,17 +65,6 @@ void test_char_only() {
   ASSERT(match("a\n", "a") == true);
 }
 
-void test_wildcard() {
-  ASSERT(match("dog", "d.+g") == true);
-  ASSERT(match("dg", "d.+g") == false);
-
-  ASSERT(match("doooooooooooog", "d.*g") == true);
-  ASSERT(match("dg", "d.*g") == true);
-
-  ASSERT(match("d..g", "^d\\.+g$") == true);
-  ASSERT(match("ad..g", "^d\\.+g$") == false);
-}
-
 void test_character_class() {
   ASSERT(match("a1", "\\d") == true);
   ASSERT(match("1a", "\\d") == true);
@@ -66,6 +82,17 @@ void test_character_class() {
   ASSERT(match("1 dog", "\\d \\w\\w\\ws") == false);
 
   ASSERT(match(".", "\\.") == true);
+}
+
+void test_wildcard() {
+  ASSERT(match("dog", "d.+g") == true);
+  ASSERT(match("dg", "d.+g") == false);
+
+  ASSERT(match("doooooooooooog", "d.*g") == true);
+  ASSERT(match("dg", "d.*g") == true);
+
+  ASSERT(match("d..g", "^d\\.+g$") == true);
+  ASSERT(match("ad..g", "^d\\.+g$") == false);
 }
 
 void test_groups() {
@@ -106,7 +133,7 @@ void test_alternation() {
 
 void run_test_cases() {
   test_char_only();
-  // // test_character_class();
+  test_character_class();
   // // test_groups();
   // // test_anchors();
   // // test_quantifiers();
