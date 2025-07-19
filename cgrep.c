@@ -100,50 +100,50 @@ char * mk_alternation(char * pattern) {
   return val;
 }
 
-token_array * tokenize(char * pattern) {
-  token * t = malloc(sizeof(token) * (strlen(pattern)));
-  int t_index = 0; 
-  int p_index = 0;
+token_array * tokenize_pattern(char * p) {
+  token * t = malloc(sizeof(token) * (strlen(p)));
+  int ti = 0; 
+  int pi = 0;
 
-  while (pattern[p_index] != '\0') {
-    if (p_index == 0 && pattern[p_index] == '^') {
-      p_index++;
+  while (p[pi] != '\0') {
+    if (pi == 0 && p[pi] == '^') {
+      pi++;
       continue;
     }
     
-    if (p_index == strlen(pattern) - 1 && pattern[p_index] == '$') {
-      p_index++;
+    if (pi == strlen(p) - 1 && p[pi] == '$') {
+      pi++;
       continue;
     }
 
-    if (pattern[p_index] == '*') {
-      if (t_index > 0) {
-        t[t_index-1].quant = Star;
+    if (p[pi] == '*') {
+      if (ti > 0) {
+        t[ti-1].quant = Star;
       }
-      p_index++;
+      pi++;
     }
-    else if (pattern[p_index] == '+') {
-      if (t_index > 0) {
-        t[t_index-1].quant = Plus;
+    else if (p[pi] == '+') {
+      if (ti > 0) {
+        t[ti-1].quant = Plus;
       }
-      p_index++;
+      pi++;
     }
 
     else {
-      token * tcur = &t[t_index];
+      token * tcur = &t[ti];
       tcur->quant = Single;
 
-      if (pattern[p_index] == '(') {
-        tcur->val = mk_alternation(&pattern[p_index]);
-        while(pattern[p_index] != ')') p_index++;
+      if (p[pi] == '(') {
+        tcur->val = mk_alternation(&p[pi]);
+        while(p[++pi] != ')');
       }
-      else if (pattern[p_index] == '[') {
-        tcur->val = mk_character_group(pattern);
-        while (pattern[p_index] != ']') p_index++;
+      else if (p[pi] == '[') {
+        tcur->val = mk_character_group(p);
+        while (p[++pi] != ']');
       }
-      else if (pattern[p_index] == '\\') {
-        p_index++;
-        switch (pattern[p_index]) {
+      else if (p[pi] == '\\') {
+        pi++;
+        switch (p[pi]) {
           case 'd':
             tcur->val = mk_character_class('d');
             break;
@@ -151,19 +151,19 @@ token_array * tokenize(char * pattern) {
             tcur->val = mk_character_class('w');
             break;
           default:
-            tcur->val = mk_character_class(pattern[p_index]);
+            tcur->val = mk_character_class(p[pi]);
         }
       }
       else {
-        tcur->val = mk_character(pattern[p_index]);
+        tcur->val = mk_character(p[pi]);
       }
-      t_index++;
-      p_index++;
+      ti++;
+      pi++;
     }
   }
   token_array * arr = malloc(sizeof(token_array));
   arr->t = t;
-  arr->length = t_index;
+  arr->length = ti;
   return arr;
 }
 
@@ -239,7 +239,7 @@ bool match(char *s, char *p) {
   bool has_start_anchor = *p == '^';
   bool has_end_anchor = *(p + strlen(p) - 1) == '$';
   
-  token_array arr = *tokenize(p);
+  token_array arr = *tokenize_pattern(p);
   token * tokens = arr.t; 
   int ti = 0;
 
