@@ -14,6 +14,9 @@
 
 bool match_start = false;
 
+bool match_end = false;
+bool did_match = false;
+
 bool _match(char *s, char *p);
 
 bool match_group(char *s, char *p) {
@@ -34,15 +37,19 @@ bool match_group(char *s, char *p) {
     }
     pp++;
   }
+  if (negate) {
+    is_match = !is_match;
+  }
   if (!is_match) {
+    if (match_end && did_match) return false;
     if (match_start) return false;
-    is_match = _match(s+1, p-1);
+    return _match(s+1, p-1);
   }
   else {
+    did_match = true;
     p = pp; 
-    is_match = _match(s+1, p+1);
+    return _match(s+1, p+1);
   }
-  return negate ? !is_match : is_match;
 }
 
 bool match_slash(char *s, char *p) {
@@ -63,21 +70,26 @@ bool match_slash(char *s, char *p) {
       is_match = *s == *p;
   }
   if (!is_match) {
+    if (match_end && did_match) return false;
     if (match_start) return false;
     return _match(s+1, p-1);
   }
+  did_match = true;
   return _match(s+1, p+1);
 }
 
 bool match_char(char *s, char *p) {
   if (*s == *p) {
+    did_match = true;
     return _match(s+1, p+1);
   }
+  if (match_end && did_match) return false;
   if (match_start) return false;
   return _match(s+1, p);
 }
 
 bool _match(char *s, char *p) {
+  if (*p == '$' && *(p+1) == '\0') return _match(s, p+1);
   if (*p == '\0') return true;  
   if (*s == '\0') return *p == '\0';
   if (*p == '\\') return match_slash(s, p+1);
@@ -89,6 +101,9 @@ bool match(char *s, char *p) {
   if (*p == '^') {
     match_start = true;
     p++;
+  }
+  if (*(p+strlen(p) - 1) == '$') {
+    match_end = true;
   }
   return _match(s, p);
 }
@@ -147,10 +162,10 @@ void test_anchors() {
   ASSERT(match("slogs", "^slog") == true);
   ASSERT(match("slogsa", "^slog") == true);
   ASSERT(match("slogs", "^log") == false);
-  // ASSERT(match("a", "a$") == true);
-  // ASSERT(match("slogs", "log$") == false);
-  // ASSERT(match("slogs", "^slogs$") == true);
-  // ASSERT(match("log", "^slogs$") == false);
+  ASSERT(match("a", "a$") == true);
+  ASSERT(match("slogs", "log$") == false);
+  ASSERT(match("slogs", "^slogs$") == true);
+  ASSERT(match("log", "^slogs$") == false);
 }
 
 void test_quantifiers() {
