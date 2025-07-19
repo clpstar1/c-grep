@@ -169,74 +169,67 @@ token_array * tokenize(char * pattern) {
 
 bool match(char *s, char *p);
 
-bool match_alternation(char *s, char *alternation_start, size_t alternation_size) {
-    char * alternation;
-    alternation = malloc(sizeof(char) * alternation_size + 1);
-    memcpy(alternation, alternation_start, alternation_size);
-    alternation[alternation_size] = '\0';
+bool match_alternation_option(char *s, char *opt_start, size_t opt_size) {
+    char *alternation = malloc(sizeof(char) * opt_size + 1);
+    memcpy(alternation, opt_start, opt_size);
+    alternation[opt_size] = '\0';
     return match(s, alternation);
 }
 
-bool match_token(char * s, char * tval) {
-  if (*tval == '.') return true;
-  if (*tval == '\\') {
-    tval++;
-    switch (*tval) {
+bool match_token(char * s, char * t) {
+  if (*t == '.') return true;
+  if (*t == '\\') {
+    t++;
+    switch (*t) {
       case 'd': return isdigit(*s);
       case 'w': return isalpha(*s);
-      default: return *s == *tval;
+      default: return *s == *t;
     }
   }
-  // (cat|dog)
-  else if (*tval == '(') {
-    //discard opening paren
-    tval++;
-
-    char *t_iter = tval;
-    int alternation_token_sz = 0; 
-
-    while (*t_iter != ')') {
-      if (*t_iter == '|') {
-        if (match_alternation(
+  if (*t == '(') {
+    t++;
+    char *opt_end = t;
+    int opt_size = 0; 
+    while (*opt_end != ')') {
+      if (*opt_end == '|') {
+        if (match_alternation_option(
           s,
-          tval,
-          alternation_token_sz)) {
+          t,
+          opt_size)) {
           return true;
         }
-        alternation_token_sz = 0;
-        t_iter++;
-        tval = t_iter;
+        opt_size = 0;
+        opt_end++;
+        t = opt_end;
       }
       else {
-        alternation_token_sz++;
-        t_iter++;
+        opt_size++;
+        opt_end++;
       }
     }
-    return match_alternation(s, tval, alternation_token_sz);
+    return match_alternation_option(s, t, opt_size);
   }
-  else if (*tval == '[') {
-    tval++;
+  if (*t == '[') {
+    t++;
     bool is_negative_group = false;
-    if (*tval == '^') {
+    if (*t == '^') {
       is_negative_group = true;
-      tval++;
+      t++;
     }
     char * s_iter;
-    while (*tval != ']') {
+    while (*t != ']') {
       s_iter = s;
       while (*s_iter != '\0') {
-        if (match_token(s_iter, tval)) {
+        if (match_token(s_iter, t)) {
           return !is_negative_group;
         }
         s_iter++;
       }
-      tval++;
+      t++;
     }
     return is_negative_group;
   }
-  else {
-    return *s == *tval;
-  }
+  return *s == *t;
 }
 
 bool match(char *s, char *p) {
