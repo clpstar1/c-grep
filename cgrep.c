@@ -68,7 +68,6 @@ char * mk_character_group(char * pattern) {
 }
 
 token_array * tokenize(char * pattern) {
-  // "abc\0";
   token * t = malloc(sizeof(token) * (strlen(pattern)));
   int t_index = 0; 
   int p_index = 0;
@@ -102,23 +101,37 @@ token_array * tokenize(char * pattern) {
       tcur->quant = Single;
 
       if (pattern[p_index] == '(') {
-        int alternation_sz = 0; 
-        while (pattern[alternation_sz] != ')') {
-          if (pattern[alternation_sz] == '\0') {
+        int token_idx = 1; // skip opening paren 
+        int option_sz = 0;
+        char pcur; 
+        while ((pcur = pattern[p_index + token_idx]) != ')') {
+          if (pcur == '\0') {
             printf("ERROR: unclosed alternation");
             exit(1);
           }
-          alternation_sz++;
+          if (pcur == '|') {
+            if (option_sz == 0) {
+              printf("ERROR: empty alternation option");
+              exit(1);
+            }
+            option_sz = 0;
+          }
+          option_sz++;
+          token_idx++;
         }
-        char * val = malloc(sizeof(char) * (alternation_sz+1));
-        for (int i = 0; i <= alternation_sz; i++) {
-          if (i == alternation_sz) {
+        if (token_idx == 1) {
+          printf("ERROR: empty alternation");
+          exit(1);
+        }
+        char * val = malloc(sizeof(char) * (token_idx+1));
+        for (int i = 0; i <= token_idx; i++) {
+          if (i == token_idx) {
             val[i] = '\0';
           }
           val[i] = pattern[p_index + i];
         }
         tcur->val = val; 
-        p_index += alternation_sz;
+        p_index += token_idx + 1;
       }
       else if (pattern[p_index] == '[') {
         tcur->val = mk_character_group(pattern);
@@ -376,15 +389,19 @@ void test_quantifiers() {
 void test_alternation() {
   ASSERT(match("catdog", "(cat|dog)+") == true);
   ASSERT(match("cat", "(bird|dog)") == false);
+  ASSERT(match("cat", "(|dog)") == false);
+  ASSERT(match("cat", "(") == false);
+  ASSERT(match("cat", "(|dog|)") == false);
+  ASSERT(match("cat", "()") == false);
 }
 
 void run_test_cases() {
-  // test_char_only();
-  // test_character_class();
-  // test_groups();
-  // test_anchors();
-  // test_quantifiers();
-  // test_wildcard();
+  test_char_only();
+  test_character_class();
+  test_groups();
+  test_anchors();
+  test_quantifiers();
+  test_wildcard();
   test_alternation();
 }
 
