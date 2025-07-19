@@ -12,13 +12,42 @@
     }                                                                          \
   } while (0)
 
-bool match(char *s, char *p);
+bool _match(char *s, char *p);
+
+bool match_group(char *s, char *p) {
+  bool is_match = false;
+  char * pp = p;
+  bool negate = *pp == '^';
+
+  if (negate) {
+    pp++;
+  }
+  while (*pp != ']') {
+    if (*pp == '\0') {
+      printf("ERROR: unclosed character group");
+      exit(1);
+    }
+    if (*s == *pp) {
+      is_match = true;
+    }
+    pp++;
+  }
+  if (!is_match) {
+    is_match = _match(s+1, p-1);
+  }
+  else {
+    p = pp; 
+    is_match = _match(s+1, p+1);
+  }
+  return negate ? !is_match : is_match;
+}
 
 bool match_slash(char *s, char *p) {
   bool is_match = false; 
 
   if (*p == '\0') {
     printf("ERROR: unterminated escape slash");
+      exit(1);
   }
   switch (*p) {
     case 'd': 
@@ -30,27 +59,30 @@ bool match_slash(char *s, char *p) {
     default:
       is_match = *s == *p;
   }
-
-  if (is_match) {
-    return match(++s, ++p);
+  if (!is_match) {
+    return _match(s+1, p-1);
   }
-  return match(++s, p-1);
+  return _match(s+1, p+1);
 }
 
-bool match(char * s, char *p) {
+bool match_char(char *s, char *p) {
+  return (*s == *p) 
+    ? _match(s+1, p+1)
+    : _match(s+1, p);
+}
+
+bool _match(char *s, char *p) {
   bool is_match = false;
-  
+
   if (*p == '\0') return true;  
   if (*s == '\0') return *p == '\0';
+  if (*p == '\\') return match_slash(s, p+1);
+  if (*p == '[') return  match_group(s, p+1);
+  return match_char(s, p);
+}
 
-  if (*p == '\\') return match_slash(s, ++p);
-
-  if (*s == *p) {
-    is_match = match(++s, ++p);
-  } else {
-    is_match = match(++s, p);
-  }
-  return is_match;
+bool match(char *s, char *p) {
+  return _match(s, p);
 }
 
 void test_char_only() {
@@ -97,7 +129,7 @@ void test_wildcard() {
 
 void test_groups() {
   ASSERT(match("abc", "[a]") == true);
-  ASSERT(match("abc", "[e]") == false);
+  ASSERT(match("a", "[e]") == false);
 
   ASSERT(match("abc", "[^abc]") == false);
   ASSERT(match("def", "[^abc]") == true);
@@ -134,7 +166,7 @@ void test_alternation() {
 void run_test_cases() {
   test_char_only();
   test_character_class();
-  // // test_groups();
+  test_groups();
   // // test_anchors();
   // // test_quantifiers();
   // // test_wildcard();
