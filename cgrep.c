@@ -244,7 +244,9 @@ bool match(char *s, char *p) {
   token * tokens = arr.t; 
   int ti = 0;
 
-  bool first_match = false;
+  // track if a match has occured, if $ is present at the end of the string 
+  // everything has to match from here on out
+  bool did_match = false;
 
   // for (int i = 0; i < arr.length; i++) {
   //   printf("val = %s, quant = %d\n", tokens[i].val, tokens[i].quant);
@@ -304,11 +306,11 @@ bool match(char *s, char *p) {
         break;
     }
 
-    if (match && !first_match) {
-      first_match = true;
+    if (match) {
+      did_match = true;
     }
 
-    if (has_end_anchor && first_match && !match) return false;
+    if (has_end_anchor && did_match && !match) return false;
     if (has_start_anchor && !match) return false;
   } while (ti < arr.length && *s != '\0');
 
