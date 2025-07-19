@@ -169,6 +169,14 @@ token_array * tokenize(char * pattern) {
 
 bool match(char *s, char *p);
 
+bool match_alternation(char *s, char *alternation_start, size_t alternation_size) {
+    char * alternation;
+    alternation = malloc(sizeof(char) * alternation_size + 1);
+    memcpy(alternation, alternation_start, alternation_size);
+    alternation[alternation_size] = '\0';
+    return match(s, alternation);
+}
+
 bool match_token(char * s, char * tval) {
   if (*tval == '.') return true;
   if (*tval == '\\') {
@@ -181,32 +189,30 @@ bool match_token(char * s, char * tval) {
   }
   // (cat|dog)
   else if (*tval == '(') {
-    // discard opening paren
+    //discard opening paren
     tval++;
-    char * t_iter = tval;
+
+    char *t_iter = tval;
     int alternation_token_sz = 0; 
-    char * alternation;
-    while (true) {
+
+    while (*t_iter != ')') {
       if (*t_iter == '|') {
-        alternation = malloc(sizeof(char) * alternation_token_sz + 1);
-        memcpy(alternation, tval, alternation_token_sz);
-        alternation[alternation_token_sz] = '\0';
-        if (match(s, alternation)) return true; 
+        if (match_alternation(
+          s,
+          tval,
+          alternation_token_sz)) {
+          return true;
+        }
         alternation_token_sz = 0;
         t_iter++;
         tval = t_iter;
-      }
-      if (*t_iter == ')') {
-        alternation = malloc(sizeof(char) * alternation_token_sz + 1);
-        memcpy(alternation, tval, alternation_token_sz);
-        alternation[alternation_token_sz] = '\0';
-        return match(s, alternation);
       }
       else {
         alternation_token_sz++;
         t_iter++;
       }
     }
+    return match_alternation(s, tval, alternation_token_sz);
   }
   else if (*tval == '[') {
     tval++;
@@ -254,7 +260,6 @@ bool match(char *s, char *p) {
 
   do {
     token t = tokens[ti];
-    quantifier q = t.quant;
     char * val = t.val;
     bool match = false;
 
@@ -263,7 +268,7 @@ bool match(char *s, char *p) {
       next = tokens[ti+1].val;
     }
 
-    switch (q) {
+    switch (t.quant) {
       // match between 1 and n times 
       case Plus:
         match = match_token(s, val);
@@ -310,8 +315,11 @@ bool match(char *s, char *p) {
       did_match = true;
     }
 
-    if (has_end_anchor && did_match && !match) return false;
-    if (has_start_anchor && !match) return false;
+    if (!match) {
+      if (has_end_anchor && did_match) return false;
+      if (has_start_anchor) return false;
+    }
+
   } while (ti < arr.length && *s != '\0');
 
   
