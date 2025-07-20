@@ -43,7 +43,6 @@ char * mk_character(char val) {
 
 char * mk_character_group(char * pattern) {
   int end = 0;
-  // [a]
 
   char pcur;
   do {
@@ -309,7 +308,7 @@ bool match(char *s, char *p) {
     }
 
     if (!match) {
-      if (has_end_anchor && did_match) return false;
+      if (did_match) return false;
       if (has_start_anchor) return false;
     }
 
@@ -340,6 +339,7 @@ void test_char_only() {
   ASSERT(match("ab", "a") == true);
   ASSERT(match("bab", "a") == true);
   ASSERT(match("b", "a") == false);
+  ASSERT(match("aba", "aa") == false);
 
   ASSERT(match("a\n", "a") == true);
 }
@@ -369,6 +369,8 @@ void test_groups() {
 
   ASSERT(match("abc", "[^abc]") == false);
   ASSERT(match("def", "[^abc]") == true);
+
+  ASSERT(match("abc", "[[a]]") == true);
 }
 
 void test_anchors() {
@@ -425,16 +427,18 @@ int main(int argc, char * argv[]) {
   }
 
   char buf[BUFSZ];
-  fgets(buf, sizeof buf, stdin);
-  int len_line = strlen(buf);
+  while(fgets(buf, sizeof buf, stdin) != NULL) {
+    int len_line = strlen(buf);
 
-  if (buf[len_line-1] == '\n') {
-    if (match(buf, argv[1])) {
-      return true;
+    if (buf[len_line-1] == '\n') {
+      buf[len_line-1] = '\0';
+      if (match(buf, pattern)) {
+        printf("%s\n", buf);
+      }
+    } else {
+      printf("ERROR: line too long got %d max = %d", len_line, BUFSZ);
+      return false;
     }
-  } else {
-    printf("ERROR: line too long got %d max = %d", len_line, BUFSZ);
-    return false;
   }
 }
   
