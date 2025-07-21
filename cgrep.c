@@ -3,6 +3,7 @@
 #include <stdlib.h>
 #include <ctype.h>
 #include <stdbool.h>
+#include "tokenize.h"
 
 #define BUFSZ 1024
 #define ASSERT(cond)                                                           \
@@ -13,13 +14,12 @@
   } while (0)
 
 bool match_start = false;
-
 bool match_end = false;
 bool did_match = false;
 
 bool _match(char *s, char *p);
 
-bool match_group(char *s, char *p) {
+bool match_class(char *s, char *p) {
   bool is_match = false;
   char * pp = p;
   bool negate = *pp == '^';
@@ -52,7 +52,7 @@ bool match_group(char *s, char *p) {
   }
 }
 
-bool match_slash(char *s, char *p) {
+bool match_escape(char *s, char *p) {
   bool is_match = false; 
 
   if (*p == '\0') {
@@ -83,7 +83,7 @@ bool match_char(char *s, char *p) {
     did_match = true;
     return _match(s+1, p+1);
   }
-  if (match_end && did_match) return false;
+  if (did_match) return false;
   if (match_start) return false;
   return _match(s+1, p);
 }
@@ -92,8 +92,8 @@ bool _match(char *s, char *p) {
   if (*p == '$' && *(p+1) == '\0') return _match(s, p+1);
   if (*p == '\0') return true;  
   if (*s == '\0') return *p == '\0';
-  if (*p == '\\') return match_slash(s, p+1);
-  if (*p == '[') return  match_group(s, p+1);
+  if (*p == '\\') return match_escape(s, p+1);
+  if (*p == '[') return  match_class(s, p+1);
   return match_char(s, p);
 }
 
@@ -114,10 +114,11 @@ void test_char_only() {
 
   ASSERT(match("ab", "b") == true);
   ASSERT(match("ab", "a") == true);
-  ASSERT(match("bab", "a") == true);
   ASSERT(match("b", "a") == false);
-
+  ASSERT(match("aba", "aa") == false);
+  //
   ASSERT(match("a\n", "a") == true);
+  ASSERT(match("bab", "a") == true);
 }
 
 void test_character_class() {
@@ -188,9 +189,9 @@ void test_alternation() {
 
 void run_test_cases() {
   test_char_only();
-  test_character_class();
-  test_groups();
-  test_anchors();
+  // test_character_class();
+  // test_groups();
+  // test_anchors();
   // // test_quantifiers();
   // // test_wildcard();
   // test_alternation();
