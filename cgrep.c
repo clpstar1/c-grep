@@ -3,7 +3,7 @@
 #include <stdlib.h>
 #include <ctype.h>
 #include <stdbool.h>
-#include "tokenize.h"
+#include <assert.h>
 
 #define BUFSZ 1024
 #define ASSERT(cond)                                                           \
@@ -13,9 +13,9 @@
     }                                                                          \
   } while (0)
 
-bool match_start = false;
-bool match_end = false;
-bool did_match = false;
+bool match_start;
+bool match_end;
+bool did_match;
 
 bool _match(char *s, char *p);
 
@@ -41,7 +41,7 @@ bool match_class(char *s, char *p) {
     is_match = !is_match;
   }
   if (!is_match) {
-    if (match_end && did_match) return false;
+    if (did_match) return false;
     if (match_start) return false;
     return _match(s+1, p-1);
   }
@@ -53,6 +53,25 @@ bool match_class(char *s, char *p) {
 }
 
 bool match_escape(char *s, char *p) {
+  char *next = p+1;
+  switch(*next) {
+    case '*':
+      while(*s != '\0' && *s == *p) {
+        if (_match(s, next+1)) return true;
+        s++;
+      }
+      return _match(s, next+1);
+    case '+':
+      if (*s != *p) {
+        return _match(s+1, p);
+      }
+      s++;
+      while (*s != '\0' && *s == *p) {
+        if (_match(s, next+1)) return true;
+        s++; 
+      }
+      return _match(s, next+1);
+  }
   bool is_match = false; 
 
   if (*p == '\0') {
@@ -70,7 +89,7 @@ bool match_escape(char *s, char *p) {
       is_match = *s == *p;
   }
   if (!is_match) {
-    if (match_end && did_match) return false;
+    if (did_match) return false;
     if (match_start) return false;
     return _match(s+1, p-1);
   }
@@ -79,6 +98,25 @@ bool match_escape(char *s, char *p) {
 }
 
 bool match_char(char *s, char *p) {
+  char *next = p+1;
+  switch(*next) {
+    case '*':
+      while(*s != '\0' && *s == *p) {
+        if (_match(s, next+1)) return true;
+        s++;
+      }
+      return _match(s, next+1);
+    case '+':
+      if (*s != *p) {
+        return _match(s+1, p);
+      }
+      s++;
+      while (*s != '\0' && *s == *p) {
+        if (_match(s, next+1)) return true;
+        s++; 
+      }
+      return _match(s, next+1);
+  }
   if (*s == *p) {
     did_match = true;
     return _match(s+1, p+1);
@@ -89,15 +127,16 @@ bool match_char(char *s, char *p) {
 }
 
 bool _match(char *s, char *p) {
-  if (*p == '$' && *(p+1) == '\0') return _match(s, p+1);
+  if (*p == '$' && *(p+1) == '\0') return true;
   if (*p == '\0') return true;  
-  if (*s == '\0') return *p == '\0';
+  if (*s == '\0') return *p == '\0' || *(p+1) == '*';
   if (*p == '\\') return match_escape(s, p+1);
   if (*p == '[') return  match_class(s, p+1);
   return match_char(s, p);
 }
 
 bool match(char *s, char *p) {
+  did_match = false;
   if (*p == '^') {
     match_start = true;
     p++;
@@ -116,9 +155,8 @@ void test_char_only() {
   ASSERT(match("ab", "a") == true);
   ASSERT(match("b", "a") == false);
   ASSERT(match("aba", "aa") == false);
-  //
-  ASSERT(match("a\n", "a") == true);
   ASSERT(match("bab", "a") == true);
+  ASSERT(match("a\n", "a") == true);
 }
 
 void test_character_class() {
@@ -192,12 +230,94 @@ void run_test_cases() {
   // test_character_class();
   // test_groups();
   // test_anchors();
-  // // test_quantifiers();
-  // // test_wildcard();
+  test_quantifiers();
+  // test_wildcard();
   // test_alternation();
 }
 
+struct token_arr {
+  struct token **tokens;
+  int length;
+};
+
+typedef enum quant_t {
+  ONCE,
+  STAR,
+  PLUS
+} quant_t;
+
+typedef enum token_t {
+  CHAR,
+  ESCAPE,
+  CHARACTER_CLASS,
+  ALTERNATION,
+} token_t;
+
+struct token {
+  quant_t quantifier;
+  token_t type; 
+  union {;
+    char ch;
+    char *cclass;
+    struct token_arr *alternatives;
+  } v;
+};
+
+void abort_with_message(char *message) {
+  printf("%s", message);
+  exit(1);
+}
+
+struct token_arr *mk_token_arr(char *p) {
+  struct token_arr *arr = malloc(sizeof(struct token_arr));
+  arr->tokens = malloc(sizeof(token_t) * strlen(p));
+  arr->length = 0;
+
+  while (*p != '\0') {
+    struct token *t = malloc(sizeof(token_t));
+    t->quantifier = ONCE;
+    if (*p == '[') {
+      char *end = strchr(p, ']');
+      if (end == NULL) {
+        abort_with_message("ERROR: unclosed character class");
+      }
+      int ssize = (end - p) + 2; // space for [ and \0 inclusive
+      char *cclass_str = malloc(sizeof(ssize));
+      // copy from p until end inclusive
+      strncpy(cclass_str, p, ssize-1);
+      cclass_str[ssize-1] = '\0';
+      t->type = CHARACTER_CLASS;
+      t->v.cclass = cclass_str;
+      printf("%s\n", t->v.cclass);
+      p = end;
+    }
+    if (*p == '\\') {
+      t->type = ESCAPE;
+      t->v.ch = *(p++);
+    }
+    else {
+      t->type = CHAR;
+      t->v.ch = *p;
+    }
+    p++;
+    if (*p == '*') {
+      t->quantifier = STAR;
+    }
+    if (*p == '+') {
+      t->quantifier = PLUS;
+    }
+    arr->tokens[arr->length++] = t;
+  }
+  return arr;
+}
+
 int main(int argc, char * argv[]) {
+  struct token_arr *arr = mk_token_arr(argv[1]);
+  printf("%d\n", arr->length);
+  for (int i = 0; i < arr->length; i++) {
+    printf("%s\n", arr->tokens[i]->v.cclass);
+  }
+  return 0;
 
   if (argc != 2) {
     printf("USAGE: string | cgrep PATTERN\n");
