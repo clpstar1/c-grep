@@ -241,7 +241,7 @@ struct token_arr {
 };
 
 typedef enum quant_t {
-  ONCE,
+  NONE,
   STAR,
   PLUS
 } quant_t;
@@ -275,7 +275,7 @@ struct token_arr *mk_token_arr(char *p) {
 
   while (*p != '\0') {
     struct token *t = malloc(sizeof(token_t));
-    t->quantifier = ONCE;
+    t->quantifier = NONE;
     if (*p == '[') {
       char *end = strchr(p, ']');
       if (end == NULL) {
@@ -288,10 +288,9 @@ struct token_arr *mk_token_arr(char *p) {
       cclass_str[ssize-1] = '\0';
       t->type = CHARACTER_CLASS;
       t->v.cclass = cclass_str;
-      printf("%s\n", t->v.cclass);
       p = end;
     }
-    if (*p == '\\') {
+    else if (*p == '\\') {
       t->type = ESCAPE;
       t->v.ch = *(p++);
     }
@@ -302,21 +301,34 @@ struct token_arr *mk_token_arr(char *p) {
     p++;
     if (*p == '*') {
       t->quantifier = STAR;
+      p++;
     }
     if (*p == '+') {
       t->quantifier = PLUS;
+      p++;
     }
     arr->tokens[arr->length++] = t;
   }
   return arr;
 }
 
-int main(int argc, char * argv[]) {
-  struct token_arr *arr = mk_token_arr(argv[1]);
+void print_token_arr(struct token_arr *arr) {
   printf("%d\n", arr->length);
   for (int i = 0; i < arr->length; i++) {
-    printf("%s\n", arr->tokens[i]->v.cclass);
+    struct token *t = arr->tokens[i];
+    printf("type = %d, quantifier = %d, ", t->type, t->quantifier);
+    if (t->type == CHAR) {
+      printf("value = %c\n", t->v.ch);
+    }
+    else if (t->type == CHARACTER_CLASS) {
+      printf("value = %s\n", t->v.cclass);
+    }
   }
+}
+
+int main(int argc, char * argv[]) {
+  struct token_arr *arr = mk_token_arr(argv[1]);
+  print_token_arr(arr);
   return 0;
 
   if (argc != 2) {
