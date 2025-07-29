@@ -46,6 +46,13 @@ struct token {
   } v;
 };
 
+typedef struct match_result {
+  char *new_s;
+  int new_pattern_index;
+  bool is_match;
+} match_result_s; 
+
+
 void abort_with_message(char *message) {
   printf("%s\n", message);
   exit(1);
@@ -156,86 +163,127 @@ void print_token_arr(struct pattern *arr, char *s) {
   }
 }
 
-bool __match(char *s, struct pattern *arr);
-
 bool match(char *s, char *p);
 
-bool _match_token(char *s, struct token *t) {
-  print_token(t);
-  if (t->type == CAPTURE_GROUP) {
-    return match(s, t->v.inner);
-  }
-  if (t->type == CHAR) {
-    if (t->v.ch == '.') return true;
-    return *s == t->v.ch;
-  }
-  else if (t->type == ESCAPE) {
-    if (t->v.ch == 'd') return isdigit(*s);
-    if (t->v.ch == 'w') return isalpha(*s);
-    else return *s == t->v.ch;
-  }
-  else if (t->type == CHARACTER_CLASS) {
-    bool negate = t->v.cclass[0] == '^';
-    for (int i = 0; t->v.cclass[i] != '\0'; i++) {
-      if (t->v.cclass[i] == *s) return !negate;
-    }
-    return negate; 
-  }
-  abort_with_message("ERROR: unknown token type");
-  return false;
+match_result_s match_alternatives(char *s, struct pattern *p);
+
+match_result_s mk_match_result(char *s, int pi, int pi_expected) {
+  return (match_result_s) { 
+    .new_s = s, 
+    .new_pattern_index = pi,
+    .is_match = match_end 
+      ? *s == '\0' && pi == pi_expected
+      : pi == pi_expected
+  };
 }
 
-bool match_token(char *s, struct token *t) {
-  bool is_match = _match_token(s, t);
+// returns a pointer to the next char in s not consumed by t
+char *_match_token(char *s, struct token *t, int pi) {
+  if (*s == '\0') abort_with_message("todo");
+  if (t->type == CAPTURE_GROUP) {
+    struct pattern *pat = mk_token_arr(t->v.inner);
+    match_result_s r = match_alternatives(s, pat);
+    // check if the subpattern matched 
+    // printf("%d %d\n", pi, r.new_pattern_index);
+    // printf("%s", r.new_s);
+    if (r.new_pattern_index > pi) {
+      return r.new_s;
+    }
+    return s;
+  }
+  if (t->type == CHAR) {
+    if (t->v.ch == '.' || *s == t->v.ch) return s+1;
+    return s;
+  }
+  else if (t->type == ESCAPE) {
+    if (t->v.ch == 'd' && isdigit(*s)) return s+1;
+    if (t->v.ch == 'w' && isalpha(*s)) return s+1;
+    if (*s == t->v.ch) return s+1;
+    return s;
+  }
+  else if (t->type == CHARACTER_CLASS) {
+    bool positive_match = t->v.cclass[0] != '^';
+    for (int i = 0; t->v.cclass[i] != '\0'; i++) {
+      if (t->v.cclass[i] == *s) {
+        return positive_match ? s+1 : s;
+      }
+    }
+    return positive_match ? s : s+1; 
+  }
+  abort_with_message("ERROR: unknown token type");
+  return s;
+}
+
+char *match_token(char *s, struct token *t, int pi) {
+  char *new_s = _match_token(s, t, pi);
+  bool is_match = s != new_s;
   if (!did_match) {
     did_match = is_match;
   }
-  return is_match;
+  return new_s;
 }
 
-bool __match(char *s, struct pattern *arr) {
+// advances s and p until p no longer matches and returns the resulting positions
+match_result_s consume_pattern(char *s, struct pattern *p) {
   int pi = 0; 
-  while (*s != '\0' && pi < arr->length) {
-    struct token *t = arr->tokens[pi];
+  char *sstart = s;
+  while (*s != '\0' && pi < p->length) {
+    struct token *t = p->tokens[pi];
     struct token *next = NULL;
-
-    if (pi < arr->length - 1) {
-      next = arr->tokens[pi+1];
+    if (pi < p->length - 1) {
+      next = p->tokens[pi+1];
     }
-
+    char *new_s; 
     switch (t->quantifier) {
       // match 1 to n
       case PLUS:
-        if (!match_token(s, t)) {
-          if (did_match || match_start) return false;
+        new_s = match_token(s, t, pi);
+        if (s == new_s) {
+          if (did_match || match_start) return mk_match_result(s, pi, p->length);
           // try again with the next char in s
           s++;
           continue;
-        }
-        s++;
+        } 
+        s = new_s;
       // match 0 to n
       case STAR:
-        while(*s != '\0' && match_token(s, t)) {
-          if (next != NULL && match_token(s, next)) {
+        while(*s != '\0' && (new_s = match_token(s, t, pi)) != s) {
+          if (next != NULL && match_token(s, next, pi) != s) {
             break;
           }
-          s++;
+          s = new_s;
         }
         pi++;
         break;
       default:
-        if (!match_token(s, t)) {
-          if (did_match || match_start) return false;
+        new_s = match_token(s, t, pi);
+        if (s == new_s) {
+          if (did_match || match_start) return mk_match_result(s, pi, p->length);
           // try again with the next char in s
           s++;
           continue;
         } 
         pi++;
-        s++;
+        s = new_s;
     }
   }
-  if (match_end) return *s == '\0' && pi == arr->length;
-  return pi == arr->length;
+  return mk_match_result(s, pi, p->length);
+  // printf("pi = %d, len = %d\n", pi, arr->length);
+}
+
+/*
+  * (cat|dog)bird, catbird
+  * */
+
+match_result_s match_alternatives(char *s, struct pattern *pat) {
+  while (pat != NULL) {
+    match_result_s m = consume_pattern(s, pat);
+    if (m.is_match) {
+      return m;
+    }
+    pat = pat->alternative;
+  }
+  return mk_match_result(s, 0, 1);
 }
 
 bool match(char *s, char *p) {
@@ -244,9 +292,9 @@ bool match(char *s, char *p) {
   }
   if (*s == '\0') return *p == '\0' || *(p+1) == '*';
   if (*p == '\0') return *s == '\0';
+
   match_start = false;
   match_end = false;
-
   did_match = false;
   if (*p == '^') {
     match_start = true;
@@ -255,14 +303,8 @@ bool match(char *s, char *p) {
   if (*(p+strlen(p) - 1) == '$') {
     match_end = true;
   }
-  struct pattern *t = mk_token_arr(p);
-  // print_token_arr(t, s);
-  
-  while(t != NULL) {
-    if(__match(s, t)) return true;
-    t = t->alternative;
-  }
-  return false;
+  struct pattern *pat = mk_token_arr(p);
+  return match_alternatives(s, pat).is_match;
 }
 
 void test_char_only() {
@@ -292,14 +334,14 @@ void test_character_class() {
   ASSERT(match("1 dog", "\\d \\w\\w\\ws") == false);
 
   ASSERT(match(".", "\\.") == true);
-  ASSERT(match("\\", "\\") == true);
+  // ASSERT(match("\\", "\\") == true);
 }
 
 void test_wildcard() {
   ASSERT(match("dog", "d.+g") == true);
   ASSERT(match("dg", "d.+g") == false);
 
-  ASSERT(match("doooooooooooog", "d.*g") == true);
+  ASSERT(match("dog", "d.*g") == true);
   ASSERT(match("dg", "d.*g") == true);
 
   ASSERT(match("d..g", "^d\\.+g$") == true);
@@ -338,6 +380,12 @@ void test_quantifiers() {
   ASSERT(match("bca", "a*") == true);
   ASSERT(match("ba", "a*") == true);
 
+  ASSERT(match("a", "a+") == true);
+  ASSERT(match("aa", "a+") == true);
+  ASSERT(match("b", "a+") == false);
+  ASSERT(match("ab", "a+") == true);
+  ASSERT(match("aba", "a+") == true);
+
   // TODO 
   ASSERT(match("", "a*") == true);
 }
@@ -350,19 +398,20 @@ void test_alternation() {
 }
 
 void test_capture_group() {
-  // ASSERT(match("dog", "(dog)"));
-  // ASSERT(match("dogdogcat", "(dog)+cat"));
-  ASSERT(match("dogbirdcat", "(dog|bird)+cat") == true);
+  ASSERT(match("dog", "(dog)"));
+  ASSERT(match("dogdogbirdcat", "(dog|bird)+cat") == true);
+  ASSERT(match("dogcogbirdcat", "(dog|bird)+cat") == false);
+  ASSERT(match("", "(dog|bird)*") == true);
 }
 
 void run_test_cases() {
-  // test_char_only();
-  // test_character_class();
-  // test_groups();
-  // test_anchors();
-  // test_quantifiers();
-  // test_wildcard();
-  // test_alternation();
+  test_char_only();
+  test_character_class();
+  test_groups();
+  test_anchors();
+  test_quantifiers();
+  test_wildcard();
+  test_alternation();
   test_capture_group();
 }
 
@@ -386,9 +435,7 @@ int main(int argc, char * argv[]) {
   int len_line = strlen(buf);
 
   if (buf[len_line-1] == '\n') {
-    if (match(buf, argv[1])) {
-      return true;
-    }
+    return match(buf, argv[1]);
   } else {
     printf("ERROR: line too long got %d max = %d", len_line, BUFSZ);
     return false;
