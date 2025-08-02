@@ -32,7 +32,7 @@ typedef enum quant_t {
 typedef enum token_t {
   CHAR,
   ESCAPE,
-  CHARACTER_CLASS,
+  BRACKET_EXPR,
   CAPTURE_GROUP,
 } token_t;
 
@@ -72,7 +72,7 @@ void print_token(struct token *t) {
     if (t->type == CHAR || t->type == ESCAPE) {
       printf("value = %c\n", t->v.ch);
     }
-    else if (t->type == CHARACTER_CLASS) {
+    else if (t->type == BRACKET_EXPR) {
       printf("value = %s\n", t->v.cclass);
     }
     else if (t->type == CAPTURE_GROUP) {
@@ -135,7 +135,7 @@ struct pattern *mk_token_arr(char *p) {
 
       char *inner = extract_inner(p, end);
       if (inner == NULL) abort_with_message("ERROR: empty character class");
-      t->type = CHARACTER_CLASS;
+      t->type = BRACKET_EXPR;
       t->v.cclass = inner;
       p = end;
     }
@@ -204,7 +204,7 @@ char *_match_token(char *s, struct token *t, int pi) {
   else if (t->type == ESCAPE) {
     return match_escape(s, t) ? s + 1 : s;
   }
-  else if (t->type == CHARACTER_CLASS) {
+  else if (t->type == BRACKET_EXPR) {
     bool positive_match = t->v.cclass[0] != '^';
     struct pattern *p = mk_token_arr(t->v.cclass);
     for (int i = 0; i < p->length; i++) {
