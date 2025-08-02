@@ -13,6 +13,8 @@
     }                                                                          \
   } while (0)
 
+#define IS_MATCH(s, s_next) (s != s_next)
+
 bool match_start;
 bool match_end;
 bool did_match;
@@ -215,75 +217,74 @@ char *_match_token(char *s, struct token *t, int pi) {
 }
 
 char *match_token(char *s, struct token *t, int pi) {
-  char *new_s = _match_token(s, t, pi);
-  bool is_match = s != new_s;
+  char *s_next = _match_token(s, t, pi);
+  bool is_match = IS_MATCH(s, s_next);
   if (!did_match) {
     did_match = is_match;
   }
-  return new_s;
+  return s_next;
 }
 
 // advances s and p until p no longer matches and returns the resulting positions
 match_result_s consume_pattern(char *s, struct pattern *p) {
   int pi = 0; 
-  char *sstart = s;
   while (*s != '\0' && pi < p->length) {
     struct token *t = p->tokens[pi];
     struct token *next = NULL;
     if (pi < p->length - 1) {
       next = p->tokens[pi+1];
     }
-    char *new_s; 
+    char *s_next; 
     switch (t->quantifier) {
       // match 1 to n
       case PLUS:
-        new_s = match_token(s, t, pi);
-        if (s == new_s) {
+        s_next = match_token(s, t, pi);
+        if (!IS_MATCH(s, s_next)) {
           if (did_match || match_start) return mk_fail_result();
           // try again with the next char in s
           s++;
           continue;
         } 
-        s = new_s;
+        s = s_next;
       // match 0 to n
       case STAR:
-        while(*s != '\0' && (new_s = match_token(s, t, pi)) != s) {
+        while(*s != '\0' && (s_next = match_token(s, t, pi)) != s) {
           if (next != NULL && match_token(s, next, pi) != s) {
             break;
           }
-          s = new_s;
+          s = s_next;
         }
         pi++;
         break;
       default:
-        new_s = match_token(s, t, pi);
+        s_next = match_token(s, t, pi);
         // printf("new_s = %s, s = %s\n", new_s, s);
         // s == new_s means fail 
-        if (s == new_s) {
+        if (!IS_MATCH(s, s_next)) {
           if (did_match || match_start) return mk_fail_result();
           // try again with the next char in s
           s++;
           continue;
         } 
         pi++;
-        s = new_s;
+        s = s_next;
     }
   }
   return mk_match_result(s, pi, p->length);
 }
 
-match_result_s match_alternatives(char *s, struct pattern *pat) {
+match_result_s match_alternatives(char *s, struct pattern *p) {
   did_match = false;
-  while (pat != NULL) {
-    if (*s == '\0' && pat->tokens[0]->quantifier == STAR) {
+  while (p != NULL) {
+    if (*s == '\0' && p->tokens[0]->quantifier == STAR) {
       return mk_match_result(s, 0, 0);
     }
-    match_result_s m = consume_pattern(s, pat);
+    match_result_s m = consume_pattern(s, p);
     if (m.is_match) {
       return m;
     }
     did_match = false;
-    pat = pat->alternative;
+    p = p->alternative;
   }
   return mk_fail_result();
 }
@@ -296,6 +297,7 @@ bool match(char *s, char *p) {
 
   match_start = false;
   match_end = false;
+  did_match = false;
   
   if (*p == '^') {
     match_start = true;
@@ -310,8 +312,7 @@ bool match(char *s, char *p) {
     match_end = true;
   }
   if (*s == '\0' && *p == '\0') return true;
-  struct pattern *pat = mk_pattern(p);
-  return match_alternatives(s, pat).is_match;
+  return match_alternatives(s, mk_pattern(p)).is_match;
 }
 
 void test_char_only() {
