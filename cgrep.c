@@ -174,7 +174,17 @@ match_result_s mk_match_result(char *s, int pi, int pi_expected) {
 }
 
 match_result_s mk_fail_result() {
-  return mk_match_result(NULL, 0, 1);
+  return mk_match_result("", 0, 1);
+}
+
+bool match_char(char *s, struct token *t) {
+  return (t->v.ch == '.' || *s == t->v.ch);
+}
+
+bool match_escape(char *s, struct token *t) {
+    if (t->v.ch == 'd') return isdigit(*s);
+    if (t->v.ch == 'w') return isalpha(*s);
+    return *s == t->v.ch;
 }
 
 // returns a pointer to the next char in s not consumed by t
@@ -192,22 +202,21 @@ char *_match_token(char *s, struct token *t, int pi) {
     return s;
   }
   if (t->type == CHAR) {
-    if (t->v.ch == '.' || *s == t->v.ch) return s+1;
-    return s;
+    return match_char(s, t) ? s + 1 : s;
   }
   else if (t->type == ESCAPE) {
-    if (t->v.ch == 'd') return isdigit(*s) ? s+1 : s;
-    if (t->v.ch == 'w') return isalpha(*s) ? s+1 : s;
-    return *s == t->v.ch ? s+1 : s;
+    return match_escape(s, t) ? s + 1 : s;
   }
   else if (t->type == CHARACTER_CLASS) {
     bool positive_match = t->v.cclass[0] != '^';
-    for (int i = 0; t->v.cclass[i] != '\0'; i++) {
-      if (t->v.cclass[i] == *s) {
-        return positive_match ? s+1 : s;
+    struct pattern *p = mk_token_arr(t->v.cclass);
+    for (int i = 0; i < p->length; i++) {
+      if (i == 0 && !positive_match) continue;
+      if (match_escape(s, p->tokens[i]) || match_char(s, p->tokens[i])) {
+        return positive_match ? s + 1 : s;
       }
     }
-    return positive_match ? s : s+1; 
+    return positive_match ? s : s + 1; 
   }
   abort_with_message("ERROR: unknown token type");
   return s;
