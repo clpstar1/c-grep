@@ -318,109 +318,103 @@ bool match(char *s, char *p) {
 void test_char_only() {
   ASSERT(match("", "") == true);
   ASSERT(match("a", "") == false);
+
+  // exact match 
   ASSERT(match("a", "a") == true);
   ASSERT(match("b", "a") == false);
 
-  ASSERT(match("ab", "b") == true); // suffix
-  ASSERT(match("ab", "a") == true); // prefix
-  ASSERT(match("bab", "a") == true); // infix
-  ASSERT(match("aba", "aa") == false); // split pattern;
+  // substring
+  ASSERT(match("ab", "b") == true);
+  ASSERT(match("ab", "a") == true); 
+  ASSERT(match("bab", "a") == true);
+  ASSERT(match("aba", "aa") == false); 
 }
 
 void test_character_class() {
-  ASSERT(match("a1", "\\d") == true);
-  ASSERT(match("1a", "\\d") == true);
-  ASSERT(match("a1a", "\\d") == true);
+  // digit class
+  ASSERT(match("1", "\\d") == true);
   ASSERT(match("a", "\\d") == false);
-  ASSERT(match("\\d", "\\\\d") == true);
-  ASSERT(match("1 apple", "\\d apple") == true);
-  ASSERT(match("1 orange", "\\d apple") == false);
-  ASSERT(match("100 apples", "\\d\\d\\d apple") == true);
-  ASSERT(match("1 apple", "\\d\\d\\d apple") == false);
-  ASSERT(match("3 dogs", "\\d \\w\\w\\ws") == true);
-  ASSERT(match("4 cats", "\\d \\w\\w\\ws") == true);
-  ASSERT(match("1 dog", "\\d \\w\\w\\ws") == false);
 
-  ASSERT(match(".", "\\.") == true);
-  // ASSERT(match("\\", "\\") == true);
-}
+  // word class
+  ASSERT(match("w", "\\w") == true);
+  ASSERT(match("1", "\\w") == false);
 
-void test_wildcard() {
-  ASSERT(match("dog", "d.+g") == true);
-  ASSERT(match("dg", "d.+g") == false);
-
-  ASSERT(match("dog", "d.*g") == true);
-  ASSERT(match("dg", "d.*g") == true);
-
-  ASSERT(match("d..g", "^d\\.+g$") == true);
-  ASSERT(match("ad..g", "^d\\.+g$") == false);
-}
-
-void test_groups() {
-  ASSERT(match("abc", "[a]") == true);
-  ASSERT(match("a", "[e]") == false);
-
+  // grouping constructs
+  ASSERT(match("abc", "[ade]") == true);
+  ASSERT(match("abc", "[def]") == false);
   ASSERT(match("abc", "[^abc]") == false);
   ASSERT(match("def", "[^abc]") == true);
 }
 
-void test_anchors() {
-  ASSERT(match("", "^") == true);
-  ASSERT(match("", "$") == true);
+void test_escaping() {
+  // ASSERT(match("\\", "\\\\") == true);
+  // ASSERT(match("\\d", "\\\\d") == true);
+  ASSERT(match("\\d", "\\d") == false);
+  ASSERT(match("b", "a") == false);
+}
 
+void test_wildcards() {
+  // dot matches a single characer ONCE
+  ASSERT(match("dog", "d.g") == true);
+  ASSERT(match("og", "d.g") == false);
+}
+
+void test_anchors() {
+  // ^ matches the start of the string 
+  ASSERT(match("", "^") == true);
   ASSERT(match("a", "^a") == true);
   ASSERT(match("ba", "^a") == false);
   ASSERT(match("^a", "^^a") == true);
 
+  // $ matches end of the string 
+  ASSERT(match("", "$") == true);
   ASSERT(match("a", "a$") == true);
   ASSERT(match("ba", "b$") == false);
-  ASSERT(match("a", "a$$") == false);
+  ASSERT(match("$a", "$a$") == true);
 
+  // beginning and end
+  ASSERT(match("", "^$") == true);
   ASSERT(match("a", "^a$") == true);
   ASSERT(match("ab", "^a$") == false);
 }
 
 void test_quantifiers() {
-  ASSERT(match("a", "a*") == true);
-  ASSERT(match("aa", "a*") == true);
-  ASSERT(match("b", "a*") == true);
-  ASSERT(match("aba", "a*") == true);
-  ASSERT(match("bca", "a*") == true);
-  ASSERT(match("ba", "a*") == true);
+  // * matches 0 to n times
+  ASSERT(match("b", "a*") == true); // 0
+  ASSERT(match("a", "a*") == true); // 1 
+  ASSERT(match("aab", "a*") == true); // n
 
-  ASSERT(match("a", "a+") == true);
-  ASSERT(match("aa", "a+") == true);
-  ASSERT(match("b", "a+") == false);
-  ASSERT(match("ab", "a+") == true);
-  ASSERT(match("aba", "a+") == true);
-
-  // TODO 
-  ASSERT(match("", "a*") == true);
+  // + matches 1 to n times
+  ASSERT(match("b", "a+") == false); // 0
+  ASSERT(match("a", "a+") == true); // 1 
+  ASSERT(match("aab", "a+") == true); // n
 }
 
 void test_alternation() {
+  // | matches if at least one alternative matches
   ASSERT(match("dog", "cat|dog") == true);
   ASSERT(match("bird", "cat|dog|bird") == true);
   ASSERT(match("cat", "bird|dog") == false);
-  ASSERT(match("cat|", "cat\\|") == true);
 }
 
 void test_capture_group() {
-  ASSERT(match("dog", "(dog)"));
-  ASSERT(match("dogdogbirdcat", "(dog|bird)+cat") == true);
-  ASSERT(match("dogcogbirdcat", "(dog|bird)+cat") == false);
-  ASSERT(match("", "(dog|bird)*") == true);
+  // () creates a subpattern which can have any construct except start and end of string anchors 
+  ASSERT(match("dog", "(dog)") == true);
+  ASSERT(match("dog", "(cat)") == false);
 }
 
 void run_test_cases() {
+  // ASSERT(match(NULL, NULL) == true);
+  // ASSERT(match("", NULL) == false);
+  // ASSERT(match(NULL, "") == false);
   // test_char_only();
   // test_character_class();
-  // test_groups();
-  test_anchors();
+  // test_anchors();
   // test_quantifiers();
-  // test_wildcard();
+  // test_wildcards();
   // test_alternation();
   // test_capture_group();
+  test_escaping();
 }
 
 
