@@ -13,7 +13,7 @@
     }                                                                          \
   } while (0)
 
-#define IS_MATCH(s, s_next) (s != s_next)
+#define IS_MATCH(s, s_next) ((s) != (s_next))
 
 bool match_start;
 bool match_end;
@@ -231,43 +231,35 @@ match_result_s consume_pattern(char *s, struct pattern *p) {
   while (*s != '\0' && pi < p->length) {
     struct token *t = p->tokens[pi];
     struct token *next = NULL;
+
     if (pi < p->length - 1) {
       next = p->tokens[pi+1];
     }
+
     char *s_next; 
     switch (t->quantifier) {
-      // match 1 to n
+      case NONE:
       case PLUS:
         s_next = match_token(s, t, pi);
         if (!IS_MATCH(s, s_next)) {
           if (did_match || match_start) return mk_fail_result();
-          // try again with the next char in s
           s++;
           continue;
         } 
         s = s_next;
-      // match 0 to n
+        if (t->quantifier == NONE) {
+          pi++; 
+          break;
+        }
       case STAR:
-        while(*s != '\0' && (s_next = match_token(s, t, pi)) != s) {
-          if (next != NULL && match_token(s, next, pi) != s) {
+        while(*s != '\0' && IS_MATCH(s_next = match_token(s, t, pi), s)) {
+          if (next != NULL && IS_MATCH(match_token(s, next, pi), s)) {
             break;
           }
           s = s_next;
         }
         pi++;
         break;
-      default:
-        s_next = match_token(s, t, pi);
-        // printf("new_s = %s, s = %s\n", new_s, s);
-        // s == new_s means fail 
-        if (!IS_MATCH(s, s_next)) {
-          if (did_match || match_start) return mk_fail_result();
-          // try again with the next char in s
-          s++;
-          continue;
-        } 
-        pi++;
-        s = s_next;
     }
   }
   return mk_match_result(s, pi, p->length);
