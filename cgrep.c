@@ -67,6 +67,33 @@ char *extract_inner(char *start, char *end){
   return inner_s;
 }
 
+void print_token(struct token *t) {
+    printf("type = %d, quantifier = %d, ", t->type, t->quantifier);
+    if (t->type == CHAR || t->type == ESCAPE) {
+      printf("value = %c\n", t->v.ch);
+    }
+    else if (t->type == CHARACTER_CLASS) {
+      printf("value = %s\n", t->v.cclass);
+    }
+    else if (t->type == CAPTURE_GROUP) {
+      printf("value = %s\n", t->v.inner);
+    }
+}
+
+void _print_token_arr(struct pattern *arr, char *s) {
+  for (int i = 0; i < arr->length; i++) {
+    struct token *t = arr->tokens[i];
+    print_token(t);
+  }
+}
+
+void print_token_arr(struct pattern *arr, char *s) {
+  while (arr != NULL) {
+    _print_token_arr(arr, s);
+    arr = arr->alternative;
+  }
+}
+
 struct pattern *mk_token_arr(char *p) {
   struct pattern *arr = malloc(sizeof(struct pattern));
   arr->length = 0;
@@ -131,34 +158,6 @@ struct pattern *mk_token_arr(char *p) {
   return arr;
 }
 
-
-void print_token(struct token *t) {
-    printf("type = %d, quantifier = %d, ", t->type, t->quantifier);
-    if (t->type == CHAR || t->type == ESCAPE) {
-      printf("value = %c\n", t->v.ch);
-    }
-    else if (t->type == CHARACTER_CLASS) {
-      printf("value = %s\n", t->v.cclass);
-    }
-    else if (t->type == CAPTURE_GROUP) {
-      printf("value = %s\n", t->v.inner);
-    }
-}
-
-void _print_token_arr(struct pattern *arr, char *s) {
-  for (int i = 0; i < arr->length; i++) {
-    struct token *t = arr->tokens[i];
-    print_token(t);
-  }
-}
-
-void print_token_arr(struct pattern *arr, char *s) {
-  while (arr != NULL) {
-    _print_token_arr(arr, s);
-    arr = arr->alternative;
-  }
-}
-
 bool match(char *s, char *p);
 
 match_result_s match_alternatives(char *s, struct pattern *p);
@@ -194,8 +193,6 @@ char *_match_token(char *s, struct token *t, int pi) {
     struct pattern *pat = mk_token_arr(t->v.inner);
     match_result_s r = match_alternatives(s, pat);
     // check if the subpattern matched 
-    // printf("%d %d\n", pi, r.new_pattern_index);
-    // printf("%s", r.new_s);
     if (r.new_pattern_index > pi) {
       return r.new_s;
     }
@@ -265,6 +262,8 @@ match_result_s consume_pattern(char *s, struct pattern *p) {
         break;
       default:
         new_s = match_token(s, t, pi);
+        // printf("new_s = %s, s = %s\n", new_s, s);
+        // s == new_s means fail 
         if (s == new_s) {
           if (did_match || match_start) return mk_fail_result();
           // try again with the next char in s
@@ -276,7 +275,6 @@ match_result_s consume_pattern(char *s, struct pattern *p) {
     }
   }
   return mk_match_result(s, pi, p->length);
-  // printf("pi = %d, len = %d\n", pi, arr->length);
 }
 
 /*
@@ -284,11 +282,16 @@ match_result_s consume_pattern(char *s, struct pattern *p) {
   * */
 
 match_result_s match_alternatives(char *s, struct pattern *pat) {
+  did_match = false;
   while (pat != NULL) {
+    if (*s == '\0' && pat->tokens[0]->quantifier == STAR) {
+      return mk_match_result(s, 0, 0);
+    }
     match_result_s m = consume_pattern(s, pat);
     if (m.is_match) {
       return m;
     }
+    did_match = false;
     pat = pat->alternative;
   }
   return mk_fail_result();
@@ -302,7 +305,6 @@ bool match(char *s, char *p) {
 
   match_start = false;
   match_end = false;
-  did_match = false;
   
   if (*p == '^') {
     match_start = true;
@@ -318,11 +320,14 @@ bool match(char *s, char *p) {
   }
   if (*s == '\0' && *p == '\0') return true;
   struct pattern *pat = mk_token_arr(p);
-  if (*s == '\0') {
-    return pat->tokens[0]->quantifier == STAR;
-  }
   return match_alternatives(s, pat).is_match;
 }
+
+/*
+ * How do i test shit systematically? 
+ * I need to do equivalence class testing
+ * maybe defining the grammar would also help 
+  * */
 
 void test_char_only() {
   ASSERT(match("", "") == true);
@@ -410,20 +415,53 @@ void test_capture_group() {
   // () creates a subpattern which can have any construct except start and end of string anchors 
   ASSERT(match("dog", "(dog)") == true);
   ASSERT(match("dog", "(cat)") == false);
+  ASSERT(match("a", "((((a))))") == true);
+  ASSERT(match("a", "(((\\(a\\))))") == false);
+}
+
+void test_combinations() {
+  // character class with quantifiers
+  ASSERT(match("11", "\\d+") == true);
+  ASSERT(match("", "\\d*") == true);
+  ASSERT(match("aab", "[a]*b") == true);
+  ASSERT(match("aab", "[\\w]*b") == true);
+  ASSERT(match("aab", "[^a]*b") == true);
+
+  // wild chard with quantifiers
+  ASSERT(match("acb", "[.]*b") == true);
+  ASSERT(match("b", "[.]*b") == true);
+  ASSERT(match("b", "[.]+b") == false);
+
+  // alternations
+  ASSERT(match("acb", "^\\w|\\d$") == false);
+  ASSERT(match("acb", "^\\w\\w\\w|\\d+$") == true);
+  ASSERT(match("111", "^\\w\\w\\w|\\d+$") == true);
+  ASSERT(match("", "^\\w\\w\\w|\\d*$") == true);
+
+  // groups and alternations 
+  ASSERT(match("abcabcabc", "(abc)+") == true);
+  ASSERT(match("abfabfabf", "(abc)+") == false);
+  ASSERT(match("catdogcatbird", "(cat|dog)+bird") == true);
+  ASSERT(match("catdogcatbird", "(cat|dog)+$") == false);
+  ASSERT(match("catcat", "cat|(dog|bird)+$") == false);
+  ASSERT(match("catcat", "c(dog|bird)*atcat$") == true);
+
+  ASSERT(match("ctacat", "c[.]+") == true);
 }
 
 void run_test_cases() {
   // ASSERT(match(NULL, NULL) == true);
   // ASSERT(match("", NULL) == false);
   // ASSERT(match(NULL, "") == false);
-  // test_char_only();
-  // test_character_class();
-  // test_anchors();
-  // test_quantifiers();
-  // test_wildcards();
-  // test_alternation();
-  // test_capture_group();
+  test_char_only();
+  test_character_class();
+  test_anchors();
+  test_quantifiers();
+  test_wildcards();
+  test_alternation();
+  test_capture_group();
   test_escaping();
+  test_combinations();
 }
 
 
