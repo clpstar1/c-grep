@@ -52,6 +52,9 @@ typedef struct match_result {
   bool is_match;
 } match_result_s; 
 
+bool match(char *s, char *p);
+
+match_result_s match_alternatives(char *s, struct pattern *p);
 
 void abort_with_message(char *message) {
   printf("%s\n", message);
@@ -80,21 +83,17 @@ void print_token(struct token *t) {
     }
 }
 
-void _print_token_arr(struct pattern *arr, char *s) {
-  for (int i = 0; i < arr->length; i++) {
-    struct token *t = arr->tokens[i];
-    print_token(t);
+void print_pattern(struct pattern *p, char *s) {
+  while (p != NULL) {
+    for (int i = 0; i < p->length; i++) {
+      struct token *t = p->tokens[i];
+      print_token(t);
+    }
+    p = p->alternative;
   }
 }
 
-void print_token_arr(struct pattern *arr, char *s) {
-  while (arr != NULL) {
-    _print_token_arr(arr, s);
-    arr = arr->alternative;
-  }
-}
-
-struct pattern *mk_token_arr(char *p) {
+struct pattern *mk_pattern(char *p) {
   struct pattern *arr = malloc(sizeof(struct pattern));
   arr->length = 0;
   if (*p == '\0') return arr;
@@ -121,7 +120,7 @@ struct pattern *mk_token_arr(char *p) {
     }
     else if (*p == '|') {
       if (*(p+1) == '\0') abort_with_message("ERROR: empty alternative");
-      arr->alternative = mk_token_arr(p+1);
+      arr->alternative = mk_pattern(p+1);
       return arr;
     }
     else if (*p == ']') {
@@ -158,10 +157,6 @@ struct pattern *mk_token_arr(char *p) {
   return arr;
 }
 
-bool match(char *s, char *p);
-
-match_result_s match_alternatives(char *s, struct pattern *p);
-
 match_result_s mk_match_result(char *s, int pi, int pi_expected) {
   return (match_result_s) { 
     .new_s = s, 
@@ -190,7 +185,7 @@ bool match_escape(char *s, struct token *t) {
 char *_match_token(char *s, struct token *t, int pi) {
   if (*s == '\0') abort_with_message("todo");
   if (t->type == CAPTURE_GROUP) {
-    struct pattern *pat = mk_token_arr(t->v.inner);
+    struct pattern *pat = mk_pattern(t->v.inner);
     match_result_s r = match_alternatives(s, pat);
     // check if the subpattern matched 
     if (r.new_pattern_index > pi) {
@@ -206,7 +201,7 @@ char *_match_token(char *s, struct token *t, int pi) {
   }
   else if (t->type == BRACKET_EXPR) {
     bool positive_match = t->v.cclass[0] != '^';
-    struct pattern *p = mk_token_arr(t->v.cclass);
+    struct pattern *p = mk_pattern(t->v.cclass);
     for (int i = 0; i < p->length; i++) {
       if (i == 0 && !positive_match) continue;
       if (match_escape(s, p->tokens[i]) || match_char(s, p->tokens[i])) {
@@ -277,10 +272,6 @@ match_result_s consume_pattern(char *s, struct pattern *p) {
   return mk_match_result(s, pi, p->length);
 }
 
-/*
-  * (cat|dog)bird, catbird
-  * */
-
 match_result_s match_alternatives(char *s, struct pattern *pat) {
   did_match = false;
   while (pat != NULL) {
@@ -319,15 +310,9 @@ bool match(char *s, char *p) {
     match_end = true;
   }
   if (*s == '\0' && *p == '\0') return true;
-  struct pattern *pat = mk_token_arr(p);
+  struct pattern *pat = mk_pattern(p);
   return match_alternatives(s, pat).is_match;
 }
-
-/*
- * How do i test shit systematically? 
- * I need to do equivalence class testing
- * maybe defining the grammar would also help 
-  * */
 
 void test_char_only() {
   ASSERT(match("", "") == true);
@@ -361,8 +346,8 @@ void test_character_class() {
 }
 
 void test_escaping() {
-  // ASSERT(match("\\", "\\\\") == true);
-  // ASSERT(match("\\d", "\\\\d") == true);
+  ASSERT(match("\\", "\\\\") == true);
+  ASSERT(match("\\d", "\\\\d") == true);
   ASSERT(match("\\d", "\\d") == false);
   ASSERT(match("b", "a") == false);
 }
