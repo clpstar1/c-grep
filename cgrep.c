@@ -173,6 +173,10 @@ match_result_s mk_match_result(char *s, int pi, int pi_expected) {
   };
 }
 
+match_result_s mk_fail_result() {
+  return mk_match_result(NULL, 0, 1);
+}
+
 // returns a pointer to the next char in s not consumed by t
 char *_match_token(char *s, struct token *t, int pi) {
   if (*s == '\0') abort_with_message("todo");
@@ -192,10 +196,9 @@ char *_match_token(char *s, struct token *t, int pi) {
     return s;
   }
   else if (t->type == ESCAPE) {
-    if (t->v.ch == 'd' && isdigit(*s)) return s+1;
-    if (t->v.ch == 'w' && isalpha(*s)) return s+1;
-    if (*s == t->v.ch) return s+1;
-    return s;
+    if (t->v.ch == 'd') return isdigit(*s) ? s+1 : s;
+    if (t->v.ch == 'w') return isalpha(*s) ? s+1 : s;
+    return *s == t->v.ch ? s+1 : s;
   }
   else if (t->type == CHARACTER_CLASS) {
     bool positive_match = t->v.cclass[0] != '^';
@@ -235,7 +238,7 @@ match_result_s consume_pattern(char *s, struct pattern *p) {
       case PLUS:
         new_s = match_token(s, t, pi);
         if (s == new_s) {
-          if (did_match || match_start) return mk_match_result(s, pi, p->length);
+          if (did_match || match_start) return mk_fail_result();
           // try again with the next char in s
           s++;
           continue;
@@ -254,7 +257,7 @@ match_result_s consume_pattern(char *s, struct pattern *p) {
       default:
         new_s = match_token(s, t, pi);
         if (s == new_s) {
-          if (did_match || match_start) return mk_match_result(s, pi, p->length);
+          if (did_match || match_start) return mk_fail_result();
           // try again with the next char in s
           s++;
           continue;
