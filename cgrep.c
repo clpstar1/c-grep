@@ -282,7 +282,7 @@ match_result_s match_alternatives(char *s, struct pattern *pat) {
     }
     pat = pat->alternative;
   }
-  return mk_match_result(s, 0, 1);
+  return mk_fail_result();
 }
 
 bool match(char *s, char *p) {
