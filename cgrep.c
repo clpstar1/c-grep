@@ -252,10 +252,10 @@ match_result_s consume_pattern(char *s, struct pattern *p) {
           break;
         }
       case STAR:
-        while(*s != '\0' && IS_MATCH(s_next = match_token(s, t, pi), s)) {
-          if (next != NULL && IS_MATCH(match_token(s, next, pi), s)) {
-            break;
-          }
+        while(*s != '\0') {
+          s_next = match_token(s, t, pi);
+          if (!IS_MATCH(s, s_next)) break;
+          if (next != NULL && IS_MATCH(match_token(s, next, pi), s)) break;
           s = s_next;
         }
         pi++;
