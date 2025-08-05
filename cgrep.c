@@ -187,8 +187,8 @@ bool match_escape(char *s, struct token *t) {
 char *_match_token(char *s, struct token *t, int pi) {
   if (*s == '\0') abort_with_message("todo");
   if (t->type == CAPTURE_GROUP) {
-    struct pattern *pat = mk_pattern(t->v.inner);
-    match_result_s r = match_alternatives(s, pat);
+    struct pattern *p = mk_pattern(t->v.inner);
+    match_result_s r = match_alternatives(s, p);
     // check if the subpattern matched 
     if (r.new_pattern_index > pi) {
       return r.new_s;
@@ -416,7 +416,19 @@ void test_combinations() {
   ASSERT(match("111", "^\\w\\w\\w|\\d+$") == true);
   ASSERT(match("", "^\\w\\w\\w|\\d*$") == true);
 
-  // groups and alternations 
+  // groups
+  // + character classes
+  ASSERT(match("a", "([a])") == true);
+  ASSERT(match("a", "([^a])") == false);
+  ASSERT(match("a", "([\\w])") == true);
+  ASSERT(match("a", "([^\\w])") == false);
+  ASSERT(match("123", "([\\d]+)") == true);
+  ASSERT(match("", "([\\w]*)") == true);
+  // + wildcards
+  ASSERT(match("a", "(.)") == true);
+  ASSERT(match("", "(.)") == false);
+
+  // + quantifiers
   ASSERT(match("abcabcabc", "(abc)+") == true);
   ASSERT(match("abfabfabf", "(abc)+") == false);
   ASSERT(match("catdogcatbird", "(cat|dog)+bird") == true);
@@ -431,6 +443,10 @@ void run_test_cases() {
   // ASSERT(match(NULL, NULL) == true);
   // ASSERT(match("", NULL) == false);
   // ASSERT(match(NULL, "") == false);
+  
+  // TODO: match empty string against * in match_token
+  // - advance s in match_token
+  // - return bool
   test_char_only();
   test_character_class();
   test_anchors();
