@@ -13,8 +13,6 @@
     }                                                                          \
   } while (0)
 
-#define IS_MATCH(s, s_next) ((s) != (s_next))
-
 bool match_start;
 bool match_end;
 bool did_match;
@@ -231,8 +229,8 @@ match_result_s match_token(char *s, struct token *t) {
 // "", ([\\w]*)
 
 // advances s and p until p no longer matches and returns the resulting positions
-match_result_s consume_pattern(char *s, pattern *p) {
-  int pi = 0; 
+match_result_s match_pattern(char *s, pattern *p) {
+  int pi = 0;
   while (pi < p->length) {
     struct token *t = p->tokens[pi];
     struct token *next = NULL;
@@ -247,12 +245,12 @@ match_result_s consume_pattern(char *s, pattern *p) {
       case PLUS:
         r = match_token(s, t);
         if (!r.is_match) {
-          if (did_match || match_start) return mk_fail_result();
-          if (*s == '\0') return mk_fail_result();
+          if (did_match || match_start || *s == '\0') return mk_fail_result();
           s++;
           continue;
         } 
         s = r.new_s;
+        // No quantifier only matches once and so does not fall through
         if (t->quantifier == NONE) {
           pi++; 
           break;
@@ -274,10 +272,7 @@ match_result_s consume_pattern(char *s, pattern *p) {
 match_result_s match_alternatives(char *s, pattern *p) {
   did_match = false;
   while (p != NULL) {
-    if (*s == '\0' && p->tokens[0]->quantifier == STAR) {
-      return mk_match_result(s, 0, 0);
-    }
-    match_result_s m = consume_pattern(s, p);
+    match_result_s m = match_pattern(s, p);
     if (m.is_match) {
       return m;
     }
