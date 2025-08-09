@@ -19,11 +19,11 @@ bool match_start;
 bool match_end;
 bool did_match;
 
-struct pattern {
+typedef struct pattern {
   struct token **tokens;
   int length;
   struct pattern *alternative;
-};
+} pattern;
 
 typedef enum quant_t {
   NONE,
@@ -54,10 +54,6 @@ typedef struct match_result {
   bool is_match;
 } match_result_s; 
 
-bool match(char *s, char *p);
-
-match_result_s match_alternatives(char *s, struct pattern *p);
-
 void abort_with_message(char *message) {
   printf("%s\n", message);
   exit(1);
@@ -85,7 +81,7 @@ void print_token(struct token *t) {
     }
 }
 
-void print_pattern(struct pattern *p, char *s) {
+void print_pattern(pattern *p, char *s) {
   while (p != NULL) {
     for (int i = 0; i < p->length; i++) {
       struct token *t = p->tokens[i];
@@ -95,8 +91,8 @@ void print_pattern(struct pattern *p, char *s) {
   }
 }
 
-struct pattern *mk_pattern(char *p) {
-  struct pattern *arr = malloc(sizeof(struct pattern));
+pattern *mk_pattern(char *p) {
+  pattern *arr = malloc(sizeof(pattern));
   arr->length = 0;
   if (*p == '\0') return arr;
 
@@ -159,6 +155,10 @@ struct pattern *mk_pattern(char *p) {
   return arr;
 }
 
+bool match(char *s, char *p);
+
+match_result_s match_alternatives(char *s, pattern *p);
+
 match_result_s mk_match_result(char *s, int pi, int pi_expected) {
   return (match_result_s) { 
     .new_s = s, 
@@ -187,7 +187,7 @@ bool match_escape(char *s, struct token *t) {
 char *_match_token(char *s, struct token *t, int pi) {
   if (*s == '\0') abort_with_message("todo");
   if (t->type == CAPTURE_GROUP) {
-    struct pattern *p = mk_pattern(t->v.inner);
+    pattern *p = mk_pattern(t->v.inner);
     match_result_s r = match_alternatives(s, p);
     // check if the subpattern matched 
     if (r.new_pattern_index > pi) {
@@ -203,7 +203,7 @@ char *_match_token(char *s, struct token *t, int pi) {
   }
   else if (t->type == BRACKET_EXPR) {
     bool positive_match = t->v.cclass[0] != '^';
-    struct pattern *p = mk_pattern(t->v.cclass);
+    pattern *p = mk_pattern(t->v.cclass);
     for (int i = 0; i < p->length; i++) {
       if (i == 0 && !positive_match) continue;
       if (match_escape(s, p->tokens[i]) || match_char(s, p->tokens[i])) {
@@ -226,7 +226,7 @@ char *match_token(char *s, struct token *t, int pi) {
 }
 
 // advances s and p until p no longer matches and returns the resulting positions
-match_result_s consume_pattern(char *s, struct pattern *p) {
+match_result_s consume_pattern(char *s, pattern *p) {
   int pi = 0; 
   while (*s != '\0' && pi < p->length) {
     struct token *t = p->tokens[pi];
@@ -265,7 +265,7 @@ match_result_s consume_pattern(char *s, struct pattern *p) {
   return mk_match_result(s, pi, p->length);
 }
 
-match_result_s match_alternatives(char *s, struct pattern *p) {
+match_result_s match_alternatives(char *s, pattern *p) {
   did_match = false;
   while (p != NULL) {
     if (*s == '\0' && p->tokens[0]->quantifier == STAR) {
