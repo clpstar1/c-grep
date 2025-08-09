@@ -17,8 +17,6 @@
 bool match_start;
 // global setting for matching the end of the string
 bool match_end;
-// globally track if a match occured
-bool did_match;
 
 typedef struct pattern {
   struct token **tokens;
@@ -181,7 +179,7 @@ bool match_escape(char *s, struct token *t) {
 }
 
 // returns a pointer to the next char in s not consumed by t
-match_result_s _match_token(char *s, struct token *t) {
+match_result_s match_token(char *s, struct token *t) {
   if (t->type == CAPTURE_GROUP) {
     pattern *p = mk_pattern(t->v.str_value);
     return match_alternatives(s, p);
@@ -214,17 +212,11 @@ match_result_s _match_token(char *s, struct token *t) {
   return mk_match_result(is_match ? s + 1 : s, is_match); 
 }
 
-match_result_s match_token(char *s, struct token *t) {
-  match_result_s r = _match_token(s, t);
-  if (!did_match) {
-    did_match = r.is_match;
-  }
-  return r;
-}
-
-// advances s and p until p no longer matches and returns the resulting positions
+// matches p against s 
 match_result_s match_pattern(char *s, pattern *p) {
   int pi = 0;
+  bool has_matched = false;
+
   while (pi < p->length) {
     struct token *t = p->tokens[pi];
     struct token *next = NULL;
@@ -240,7 +232,7 @@ match_result_s match_pattern(char *s, pattern *p) {
         r = match_token(s, t);
         if (!r.is_match) {
           // mismatch in the midst of pattern
-          if (did_match) return mk_fail_result(); 
+          if (has_matched) return mk_fail_result(); 
           // every token has to match the start of s until p is exhausted
           if (match_start) return mk_fail_result();
           // nothing more to match
@@ -248,6 +240,7 @@ match_result_s match_pattern(char *s, pattern *p) {
           s++;
           continue;
         } 
+        has_matched = true;
         s = r.new_s;
         // No quantifier only matches once and so does not fall through
         if (t->quantifier == NONE) {
@@ -259,6 +252,7 @@ match_result_s match_pattern(char *s, pattern *p) {
           r = match_token(s, t);
           if (!r.is_match) break;
           if (next != NULL && match_token(s, next).is_match) break;
+          has_matched = true;
           s = r.new_s;
         }
         pi++;
@@ -273,13 +267,11 @@ match_result_s match_pattern(char *s, pattern *p) {
 }
 
 match_result_s match_alternatives(char *s, pattern *p) {
-  did_match = false;
   while (p != NULL) {
     match_result_s m = match_pattern(s, p);
     if (m.is_match) {
       return m;
     }
-    did_match = false;
     p = p->alternative;
   }
   return mk_fail_result();
@@ -293,7 +285,6 @@ bool match(char *s, char *p) {
 
   match_start = false;
   match_end = false;
-  did_match = false;
   
   if (*p == '^') {
     match_start = true;
@@ -489,4 +480,24 @@ int main(int argc, char * argv[]) {
   }
 }
   
+// match_result_s match_quantifier(char *s, struct token *t, struct token *next) {
+//   match_result_s r;
+//   switch (t->quantifier) {
+//     case NONE:
+//     case PLUS:
+//       r = match_token(s, t);
+//       if (t->quantifier == NONE) return r;
+//       s = r.new_s;
+//     case STAR:
+//       while (*s != '\0') {
+//         r = match_token(s, t);
+//         if (!r.is_match) break;
+//         if (next != NULL && match_token(s, next).is_match) break;
+//         s = r.new_s;
+//       }
+//       r.new_s = s;
+//       r.is_match = true;
+//       return r;
+//   }
+// }
 
