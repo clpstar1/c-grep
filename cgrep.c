@@ -167,6 +167,13 @@ match_result_s mk_match_result(char *s, int pi, int pi_expected) {
   };
 }
 
+match_result_s _mk_match_result(char *new_s, bool is_match) {
+  return (match_result_s) { 
+    .new_s = new_s, 
+    .is_match = is_match
+  };
+}
+
 match_result_s mk_fail_result() {
   return mk_match_result("", 0, 1);
 }
@@ -182,51 +189,54 @@ bool match_escape(char *s, struct token *t) {
 }
 
 // returns a pointer to the next char in s not consumed by t
-char *_match_token(char *s, struct token *t) {
-  if (*s == '\0') abort_with_message("todo");
+match_result_s _match_token(char *s, struct token *t) {
+  if (*s == '\0') {
+    return _mk_match_result(s, t->quantifier == STAR);
+  }
+  bool is_match = false;
   if (t->type == CAPTURE_GROUP) {
     pattern *p = mk_pattern(t->v.inner);
-    match_result_s r = match_alternatives(s, p);
-    // check if the subpattern matched 
-    if (r.is_match) {
-      return r.new_s;
-    }
-    return s;
+    return match_alternatives(s, p);
   }
   if (t->type == CHAR) {
-    return match_char(s, t) ? s + 1 : s;
+    is_match = match_char(s, t);
   }
   else if (t->type == ESCAPE) {
-    return match_escape(s, t) ? s + 1 : s;
+    is_match = match_escape(s, t);
   }
   else if (t->type == BRACKET_EXPR) {
     bool positive_match = t->v.cclass[0] != '^';
+    bool found = false;
     pattern *p = mk_pattern(t->v.cclass);
     for (int i = 0; i < p->length; i++) {
       if (i == 0 && !positive_match) continue;
       if (match_escape(s, p->tokens[i]) || match_char(s, p->tokens[i])) {
-        return positive_match ? s + 1 : s;
+        found = true;
+        break;
       }
     }
-    return positive_match ? s : s + 1; 
+    is_match = positive_match ? found : !found;
+  } else {
+    abort_with_message("unknown token type");
   }
-  abort_with_message("ERROR: unknown token type");
-  return s;
+  return _mk_match_result(is_match ? s + 1 : s, is_match); 
 }
 
-char *match_token(char *s, struct token *t) {
-  char *s_next = _match_token(s, t);
-  bool is_match = IS_MATCH(s, s_next);
+match_result_s match_token(char *s, struct token *t) {
+  match_result_s r = _match_token(s, t);
   if (!did_match) {
-    did_match = is_match;
+    did_match = r.is_match;
   }
-  return s_next;
+  return r;
 }
+
+// abc, [ade]
+// bc, [de]
 
 // advances s and p until p no longer matches and returns the resulting positions
 match_result_s consume_pattern(char *s, pattern *p) {
   int pi = 0; 
-  while (*s != '\0' && pi < p->length) {
+  while (pi < p->length) {
     struct token *t = p->tokens[pi];
     struct token *next = NULL;
 
@@ -234,27 +244,28 @@ match_result_s consume_pattern(char *s, pattern *p) {
       next = p->tokens[pi+1];
     }
 
-    char *s_next; 
+    match_result_s r; 
     switch (t->quantifier) {
       case NONE:
       case PLUS:
-        s_next = match_token(s, t);
-        if (!IS_MATCH(s, s_next)) {
+        r = match_token(s, t);
+        if (!r.is_match) {
           if (did_match || match_start) return mk_fail_result();
+          if (*s == '\0') return mk_fail_result();
           s++;
           continue;
         } 
-        s = s_next;
+        s = r.new_s;
         if (t->quantifier == NONE) {
           pi++; 
           break;
         }
       case STAR:
         while(*s != '\0') {
-          s_next = match_token(s, t);
-          if (!IS_MATCH(s, s_next)) break;
-          if (next != NULL && IS_MATCH(match_token(s, next), s)) break;
-          s = s_next;
+          r = match_token(s, t);
+          if (!r.is_match) break;
+          if (next != NULL && match_token(s, next).is_match) break;
+          s = r.new_s;
         }
         pi++;
         break;
