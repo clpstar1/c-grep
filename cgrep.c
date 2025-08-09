@@ -13,8 +13,11 @@
     }                                                                          \
   } while (0)
 
+// global setting for matching the start of the string
 bool match_start;
+// global setting for matching the end of the string
 bool match_end;
+// globally track if a match occured
 bool did_match;
 
 typedef struct pattern {
@@ -155,16 +158,8 @@ bool match(char *s, char *p);
 
 match_result_s match_alternatives(char *s, pattern *p);
 
-match_result_s mk_match_result(char *s, int pi, int pi_expected) {
-  return (match_result_s) { 
-    .new_s = s, 
-    .is_match = match_end 
-      ? *s == '\0' && pi == pi_expected
-      : pi == pi_expected
-  };
-}
 
-match_result_s _mk_match_result(char *new_s, bool is_match) {
+match_result_s mk_match_result(char *new_s, bool is_match) {
   return (match_result_s) { 
     .new_s = new_s, 
     .is_match = is_match
@@ -172,7 +167,7 @@ match_result_s _mk_match_result(char *new_s, bool is_match) {
 }
 
 match_result_s mk_fail_result() {
-  return mk_match_result("", 0, 1);
+  return mk_match_result(NULL, false);
 }
 
 bool match_char(char *s, struct token *t) {
@@ -192,7 +187,7 @@ match_result_s _match_token(char *s, struct token *t) {
     return match_alternatives(s, p);
   }
   if (*s == '\0') {
-    return _mk_match_result(s, t->quantifier == STAR);
+    return mk_match_result(s, t->quantifier == STAR);
   }
   bool is_match = false;
   if (t->type == CHAR) {
@@ -216,7 +211,7 @@ match_result_s _match_token(char *s, struct token *t) {
   } else {
     abort_with_message("unknown token type");
   }
-  return _mk_match_result(is_match ? s + 1 : s, is_match); 
+  return mk_match_result(is_match ? s + 1 : s, is_match); 
 }
 
 match_result_s match_token(char *s, struct token *t) {
@@ -226,7 +221,6 @@ match_result_s match_token(char *s, struct token *t) {
   }
   return r;
 }
-// "", ([\\w]*)
 
 // advances s and p until p no longer matches and returns the resulting positions
 match_result_s match_pattern(char *s, pattern *p) {
@@ -245,7 +239,12 @@ match_result_s match_pattern(char *s, pattern *p) {
       case PLUS:
         r = match_token(s, t);
         if (!r.is_match) {
-          if (did_match || match_start || *s == '\0') return mk_fail_result();
+          // mismatch in the midst of pattern
+          if (did_match) return mk_fail_result(); 
+          // every token has to match the start of s until p is exhausted
+          if (match_start) return mk_fail_result();
+          // nothing more to match
+          if (*s == '\0') return mk_fail_result();
           s++;
           continue;
         } 
@@ -266,7 +265,11 @@ match_result_s match_pattern(char *s, pattern *p) {
         break;
     }
   }
-  return mk_match_result(s, pi, p->length);
+  bool is_match = match_end
+    ? *s == '\0' && pi == p->length
+    : pi == p->length;
+
+  return mk_match_result(s, is_match);
 }
 
 match_result_s match_alternatives(char *s, pattern *p) {
