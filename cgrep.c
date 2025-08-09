@@ -190,14 +190,14 @@ bool match_escape(char *s, struct token *t) {
 
 // returns a pointer to the next char in s not consumed by t
 match_result_s _match_token(char *s, struct token *t) {
-  if (*s == '\0') {
-    return _mk_match_result(s, t->quantifier == STAR);
-  }
-  bool is_match = false;
   if (t->type == CAPTURE_GROUP) {
     pattern *p = mk_pattern(t->v.inner);
     return match_alternatives(s, p);
   }
+  if (*s == '\0') {
+    return _mk_match_result(s, t->quantifier == STAR);
+  }
+  bool is_match = false;
   if (t->type == CHAR) {
     is_match = match_char(s, t);
   }
@@ -229,9 +229,7 @@ match_result_s match_token(char *s, struct token *t) {
   }
   return r;
 }
-
-// abc, [ade]
-// bc, [de]
+// "", ([\\w]*)
 
 // advances s and p until p no longer matches and returns the resulting positions
 match_result_s consume_pattern(char *s, pattern *p) {
