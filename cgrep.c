@@ -50,7 +50,6 @@ struct token {
 
 typedef struct match_result {
   char *new_s;
-  int new_pattern_index;
   bool is_match;
 } match_result_s; 
 
@@ -162,7 +161,6 @@ match_result_s match_alternatives(char *s, pattern *p);
 match_result_s mk_match_result(char *s, int pi, int pi_expected) {
   return (match_result_s) { 
     .new_s = s, 
-    .new_pattern_index = pi,
     .is_match = match_end 
       ? *s == '\0' && pi == pi_expected
       : pi == pi_expected
@@ -190,7 +188,7 @@ char *_match_token(char *s, struct token *t, int pi) {
     pattern *p = mk_pattern(t->v.inner);
     match_result_s r = match_alternatives(s, p);
     // check if the subpattern matched 
-    if (r.new_pattern_index > pi) {
+    if (r.is_match) {
       return r.new_s;
     }
     return s;
