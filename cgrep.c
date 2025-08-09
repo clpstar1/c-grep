@@ -182,7 +182,7 @@ bool match_escape(char *s, struct token *t) {
 }
 
 // returns a pointer to the next char in s not consumed by t
-char *_match_token(char *s, struct token *t, int pi) {
+char *_match_token(char *s, struct token *t) {
   if (*s == '\0') abort_with_message("todo");
   if (t->type == CAPTURE_GROUP) {
     pattern *p = mk_pattern(t->v.inner);
@@ -214,8 +214,8 @@ char *_match_token(char *s, struct token *t, int pi) {
   return s;
 }
 
-char *match_token(char *s, struct token *t, int pi) {
-  char *s_next = _match_token(s, t, pi);
+char *match_token(char *s, struct token *t) {
+  char *s_next = _match_token(s, t);
   bool is_match = IS_MATCH(s, s_next);
   if (!did_match) {
     did_match = is_match;
@@ -238,7 +238,7 @@ match_result_s consume_pattern(char *s, pattern *p) {
     switch (t->quantifier) {
       case NONE:
       case PLUS:
-        s_next = match_token(s, t, pi);
+        s_next = match_token(s, t);
         if (!IS_MATCH(s, s_next)) {
           if (did_match || match_start) return mk_fail_result();
           s++;
@@ -251,9 +251,9 @@ match_result_s consume_pattern(char *s, pattern *p) {
         }
       case STAR:
         while(*s != '\0') {
-          s_next = match_token(s, t, pi);
+          s_next = match_token(s, t);
           if (!IS_MATCH(s, s_next)) break;
-          if (next != NULL && IS_MATCH(match_token(s, next, pi), s)) break;
+          if (next != NULL && IS_MATCH(match_token(s, next), s)) break;
           s = s_next;
         }
         pi++;
