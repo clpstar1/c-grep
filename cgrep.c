@@ -42,9 +42,8 @@ struct token {
   quant_t quantifier;
   token_t type; 
   union {
-    char ch;
-    char *cclass;
-    char *inner;
+    char ch_value;
+    char *str_value;
   } v;
 };
 
@@ -70,13 +69,13 @@ char *extract_inner(char *start, char *end){
 void print_token(struct token *t) {
     printf("type = %d, quantifier = %d, ", t->type, t->quantifier);
     if (t->type == CHAR || t->type == ESCAPE) {
-      printf("value = %c\n", t->v.ch);
+      printf("value = %c\n", t->v.ch_value);
     }
     else if (t->type == BRACKET_EXPR) {
-      printf("value = %s\n", t->v.cclass);
+      printf("value = %s\n", t->v.str_value);
     }
     else if (t->type == CAPTURE_GROUP) {
-      printf("value = %s\n", t->v.inner);
+      printf("value = %s\n", t->v.str_value);
     }
 }
 
@@ -103,16 +102,16 @@ pattern *mk_pattern(char *p) {
       t->type = ESCAPE;
       if (*(p+1) == '\0') abort_with_message("ERROR: empty escape sequence");
       p++;
-      t->v.ch = *p;
+      t->v.ch_value = *p;
     }
     else if (*p == '(') {
       char *end = p;
       while ((end = strrchr(end, ')')) != NULL && *(end-1) == '\\');
       if (end == NULL) abort_with_message("ERROR: unclosed capture group");
       char *inner = extract_inner(p, end);
-      if (inner == NULL) abort_with_message("ERROR: empty capture group");
+      if (*inner == '\0' || inner == NULL) abort_with_message("ERROR: empty capture group");
       t->type = CAPTURE_GROUP;
-      t->v.inner = inner;
+      t->v.str_value = inner;
       p = end;
     }
     else if (*p == '|') {
@@ -132,12 +131,12 @@ pattern *mk_pattern(char *p) {
       char *inner = extract_inner(p, end);
       if (inner == NULL) abort_with_message("ERROR: empty character class");
       t->type = BRACKET_EXPR;
-      t->v.cclass = inner;
+      t->v.str_value = inner;
       p = end;
     }
     else {
       t->type = CHAR;
-      t->v.ch = *p;
+      t->v.ch_value = *p;
     }
     p++;
     if (*p == '*') {
@@ -179,19 +178,19 @@ match_result_s mk_fail_result() {
 }
 
 bool match_char(char *s, struct token *t) {
-  return (t->v.ch == '.' || *s == t->v.ch);
+  return (t->v.ch_value == '.' || *s == t->v.ch_value);
 }
 
 bool match_escape(char *s, struct token *t) {
-    if (t->v.ch == 'd') return isdigit(*s);
-    if (t->v.ch == 'w') return isalpha(*s);
-    return *s == t->v.ch;
+    if (t->v.ch_value == 'd') return isdigit(*s);
+    if (t->v.ch_value == 'w') return isalpha(*s);
+    return *s == t->v.ch_value;
 }
 
 // returns a pointer to the next char in s not consumed by t
 match_result_s _match_token(char *s, struct token *t) {
   if (t->type == CAPTURE_GROUP) {
-    pattern *p = mk_pattern(t->v.inner);
+    pattern *p = mk_pattern(t->v.str_value);
     return match_alternatives(s, p);
   }
   if (*s == '\0') {
@@ -205,9 +204,9 @@ match_result_s _match_token(char *s, struct token *t) {
     is_match = match_escape(s, t);
   }
   else if (t->type == BRACKET_EXPR) {
-    bool positive_match = t->v.cclass[0] != '^';
+    bool positive_match = t->v.str_value[0] != '^';
     bool found = false;
-    pattern *p = mk_pattern(t->v.cclass);
+    pattern *p = mk_pattern(t->v.str_value);
     for (int i = 0; i < p->length; i++) {
       if (i == 0 && !positive_match) continue;
       if (match_escape(s, p->tokens[i]) || match_char(s, p->tokens[i])) {
@@ -402,6 +401,8 @@ void test_capture_group() {
   ASSERT(match("dog", "(cat)") == false);
   ASSERT(match("a", "((((a))))") == true);
   ASSERT(match("a", "(((\\(a\\))))") == false);
+  ASSERT(match("", "(((a*)a*))") == true);
+  ASSERT(match("", "(((a*)a+))") == false);
 }
 
 void test_combinations() {
@@ -424,6 +425,7 @@ void test_combinations() {
   ASSERT(match("", "^\\w\\w\\w|\\d*$") == true);
 
   // groups
+  //
   // + character classes
   ASSERT(match("a", "([a])") == true);
   ASSERT(match("a", "([^a])") == false);
@@ -431,9 +433,11 @@ void test_combinations() {
   ASSERT(match("a", "([^\\w])") == false);
   ASSERT(match("123", "([\\d]+)") == true);
   ASSERT(match("", "([\\w]*)") == true);
+
   // + wildcards
   ASSERT(match("a", "(.)") == true);
   ASSERT(match("", "(.)") == false);
+  ASSERT(match("ctacat", "c[.]+") == true);
 
   // + quantifiers
   ASSERT(match("abcabcabc", "(abc)+") == true);
@@ -443,17 +447,13 @@ void test_combinations() {
   ASSERT(match("catcat", "cat|(dog|bird)+$") == false);
   ASSERT(match("catcat", "c(dog|bird)*atcat$") == true);
 
-  ASSERT(match("ctacat", "c[.]+") == true);
+
 }
 
 void run_test_cases() {
   // ASSERT(match(NULL, NULL) == true);
   // ASSERT(match("", NULL) == false);
   // ASSERT(match(NULL, "") == false);
-  
-  // TODO: match empty string against * in match_token
-  // - advance s in match_token
-  // - return bool
   test_char_only();
   test_character_class();
   test_anchors();
